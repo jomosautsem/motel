@@ -27,26 +27,46 @@ interface RoomCardProps {
   room: Room;
   onStatusChange: (id: string, status: RoomStatus) => void;
   onOpenControls?: (room: Room) => void;
+  variant?: 'standard' | 'compact';
 }
 
-export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpenControls }) => {
+export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpenControls, variant = 'standard' }) => {
   const [showActions, setShowActions] = useState(false);
+
+  // Calculate duration in hours to determine color
+  const getDurationHours = () => {
+    if (!room.checkInTime || !room.checkOutTime) return 0;
+    const start = new Date(room.checkInTime).getTime();
+    const end = new Date(room.checkOutTime).getTime();
+    return (end - start) / (1000 * 60 * 60);
+  };
+
+  const getOccupancyColorClass = () => {
+    const hours = getDurationHours();
+    // Allow small margin of error for floating point calc
+    if (hours <= 2.1) return 'bg-green-500 text-white border-green-600';
+    if (hours <= 4.1) return 'bg-orange-500 text-white border-orange-600';
+    if (hours <= 5.1) return 'bg-yellow-400 text-slate-900 border-yellow-500';
+    if (hours <= 8.1) return 'bg-red-600 text-white border-red-700';
+    return 'bg-blue-600 text-white border-blue-700'; // 12h or more
+  };
 
   const getStatusColor = (status: RoomStatus) => {
     switch (status) {
       case RoomStatus.AVAILABLE: return 'bg-white border-green-200 text-green-700 hover:border-green-400';
-      case RoomStatus.OCCUPIED: return 'bg-rose-50 border-rose-200 text-rose-700 hover:border-rose-400';
+      case RoomStatus.OCCUPIED: return getOccupancyColorClass();
       case RoomStatus.CLEANING: return 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400';
       case RoomStatus.MAINTENANCE: return 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:border-yellow-400';
     }
   };
 
   const getStatusBadge = (status: RoomStatus) => {
+    if (status === RoomStatus.OCCUPIED) return 'bg-black/20 text-current backdrop-blur-sm';
     switch (status) {
       case RoomStatus.AVAILABLE: return 'bg-green-100 text-green-800';
-      case RoomStatus.OCCUPIED: return 'bg-rose-100 text-rose-800';
       case RoomStatus.CLEANING: return 'bg-blue-100 text-blue-800';
       case RoomStatus.MAINTENANCE: return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-slate-100 text-slate-800';
     }
   };
 
@@ -70,6 +90,48 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpen
     }
   };
 
+  // --- COMPACT VIEW (DASHBOARD) ---
+  if (variant === 'compact') {
+    const isOccupied = room.status === RoomStatus.OCCUPIED;
+    return (
+      <div 
+        onClick={() => {
+           if (room.status === RoomStatus.AVAILABLE) onStatusChange(room.id, RoomStatus.OCCUPIED);
+           else if (isOccupied) setShowActions(!showActions); // Toggle simple view or external handler
+        }}
+        className={`relative p-3 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between h-[140px] cursor-pointer ${getStatusColor(room.status)}`}
+      >
+        <div className="flex justify-between items-start">
+          <span className="text-lg font-bold leading-none">Hab {room.id}</span>
+          {isOccupied && (
+             <div className="flex items-center gap-1 text-[10px] bg-black/10 px-1.5 py-0.5 rounded backdrop-blur-md">
+               <Clock className="w-3 h-3" />
+               <span>{Math.round(getDurationHours())}h</span>
+             </div>
+          )}
+        </div>
+        
+        <div className="flex-1 flex flex-col justify-center items-center text-center">
+          {isOccupied ? (
+            <>
+              <p className="text-2xl font-bold">{formatTime(room.checkOutTime)}</p>
+              <p className="text-[10px] opacity-90 uppercase tracking-wide mt-1">Salida</p>
+            </>
+          ) : (
+            <p className="text-sm font-medium opacity-70">{room.status}</p>
+          )}
+        </div>
+
+        <div className="flex justify-between items-end text-[10px] font-medium opacity-80">
+          <span>{room.type}</span>
+          {isOccupied && <span>{room.peopleCount} Pers.</span>}
+        </div>
+      </div>
+    );
+  }
+
+  // --- STANDARD VIEW (ROOMS SCREEN) ---
+  
   // Occupied Menu Action Button Component
   const ActionBtn = ({ icon: Icon, label, colorClass, onClick }: { icon: any, label: string, colorClass: string, onClick?: () => void }) => (
     <button 
@@ -104,7 +166,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpen
             <>
               {showActions ? (
                 // EXPANDED MENU VIEW
-                <div className="animate-fade-in space-y-3">
+                <div className="animate-fade-in space-y-3 text-slate-800">
                   {/* History Log Box */}
                   <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-inner">
                     <div className="text-xs font-bold text-slate-400 uppercase mb-2">Historial de la Estancia</div>
@@ -150,52 +212,52 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpen
                 </div>
               ) : (
                 // STANDARD INFO VIEW
-                <div className="space-y-3 bg-white/60 p-3 rounded-xl border border-rose-100/50 backdrop-blur-sm">
+                <div className="space-y-3 bg-white/20 p-3 rounded-xl border border-white/30 backdrop-blur-sm text-current">
                   
                   {/* Client & People */}
-                  <div className="flex justify-between items-start border-b border-rose-100 pb-2">
-                     <div className="flex items-center gap-2 font-semibold text-slate-700">
-                        <User className="w-4 h-4 text-rose-500" />
+                  <div className="flex justify-between items-start border-b border-white/20 pb-2">
+                     <div className="flex items-center gap-2 font-semibold">
+                        <User className="w-4 h-4 opacity-80" />
                         <span className="truncate max-w-[110px] text-sm" title={room.clientName}>{room.clientName || 'Anónimo'}</span>
                      </div>
-                     <div className="flex items-center gap-1 text-slate-500 text-xs bg-white px-2 py-1 rounded-md border border-slate-100 shadow-sm">
+                     <div className="flex items-center gap-1 text-xs bg-black/10 px-2 py-1 rounded-md border border-white/10 shadow-sm">
                         <Users className="w-3 h-3" />
                         <span>{room.peopleCount || 2}</span>
                      </div>
                   </div>
 
                   {/* Time Range */}
-                  <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <div className="flex gap-2 font-mono">
+                  <div className="flex items-center gap-2 text-xs bg-black/10 p-2 rounded-lg">
+                    <Clock className="w-3.5 h-3.5 opacity-70" />
+                    <div className="flex gap-2 font-mono font-medium">
                       <span>{formatTime(room.checkInTime)}</span>
-                      <span className="text-slate-300">➜</span>
+                      <span className="opacity-50">➜</span>
                       <span>{formatTime(room.checkOutTime)}</span>
                     </div>
                   </div>
 
                   {/* Vehicle Details */}
                   {room.entryType !== 'Pie' && (
-                    <div className="text-xs text-slate-600 space-y-1 pl-2 border-l-2 border-rose-200">
-                       <div className="flex items-center gap-1.5 font-medium text-rose-700">
+                    <div className="text-xs space-y-1 pl-2 border-l-2 border-white/30">
+                       <div className="flex items-center gap-1.5 font-medium opacity-90">
                          {getEntryIcon(room.entryType)}
                          <span>{room.entryType}</span>
                        </div>
                        {(room.vehicleBrand || room.vehiclePlate) ? (
-                          <div className="space-y-0.5">
-                            <p className="opacity-80 truncate">{room.vehicleBrand} {room.vehicleModel} {room.vehicleColor}</p>
-                            <p className="font-mono font-bold text-slate-700 bg-slate-100 inline-block px-1 rounded text-[10px]">{room.vehiclePlate}</p>
+                          <div className="space-y-0.5 opacity-80">
+                            <p className="truncate">{room.vehicleBrand} {room.vehicleModel} {room.vehicleColor}</p>
+                            <p className="font-mono font-bold inline-block px-1 rounded text-[10px] bg-black/10">{room.vehiclePlate}</p>
                           </div>
                        ) : (
-                         <p className="text-slate-400 italic">Sin datos de vehículo</p>
+                         <p className="opacity-60 italic">Sin datos de vehículo</p>
                        )}
                     </div>
                   )}
 
                   {/* Price */}
                   <div className="pt-1 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</span>
-                    <div className="flex items-center text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                    <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">Total</span>
+                    <div className="flex items-center font-bold bg-black/10 px-2 py-1 rounded-md border border-white/10">
                       <DollarSign className="w-3.5 h-3.5" />
                       <span>{room.totalPrice || 0}</span>
                     </div>
@@ -230,14 +292,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onStatusChange, onOpen
       </div>
 
       {/* Footer / Main Buttons */}
-      <div className="mt-4 pt-4 border-t border-black/5">
+      <div className={`mt-4 pt-4 border-t ${room.status === RoomStatus.OCCUPIED ? 'border-white/20' : 'border-black/5'}`}>
         {room.status === RoomStatus.OCCUPIED ? (
           <button 
             onClick={() => setShowActions(!showActions)}
             className={`w-full py-2.5 rounded-lg text-sm font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-2 ${
               showActions 
-                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
-                : 'bg-rose-600 text-white hover:bg-rose-700'
+                ? 'bg-white text-slate-700 hover:bg-slate-50' 
+                : 'bg-black/20 text-white hover:bg-black/30'
             }`}
           >
             {showActions ? (

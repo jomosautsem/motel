@@ -51,3 +51,28 @@ export interface Employee {
   role: string;
   status: 'Activo' | 'Descanso';
 }
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  category: 'Bebida' | 'Snack' | 'Cocina' | 'Otro';
+  stock: number;
+}
+
+export interface ConsumptionItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Consumption {
+  id: string;
+  roomId: string; // "General" if not attached to a room (e.g. employee or walk-in)
+  items: ConsumptionItem[];
+  totalAmount: number;
+  timestamp: Date;
+  status: 'Pagado' | 'Pendiente en Habitación';
+}

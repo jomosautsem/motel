@@ -28,7 +28,7 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
   // Price
   const [price, setPrice] = useState(280);
 
-  // Initialize time on open
+  // Initialize form on open
   useEffect(() => {
     if (isOpen) {
       const now = new Date();
@@ -42,18 +42,66 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
       const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
       setEndTime(formatTime(end));
       
-      // Reset fields
-      setClientName('');
+      // Default name is the Room ID as requested
+      setClientName(`Habitación ${room.id}`);
+      
       setPeopleCount(2);
       setEntryType('Auto');
       setBrand('');
       setModel('');
       setColor('');
       setPlate('');
-      // Default price for 4 hours
-      setPrice(280);
     }
-  }, [isOpen]);
+  }, [isOpen, room.id]);
+
+  // Pricing Logic Helper
+  const calculatePrice = (hours: number) => {
+    // Basic logic: 
+    // < 2 hours: $220
+    // 4 hours: $280
+    // 5-8 hours: +$50/hr roughly
+    // 12 hours: $480
+    
+    // We can make a simple formula or buckets
+    if (hours <= 2) return 220;
+    if (hours <= 4.5) return 280; // Standard 4h block allows a little grace
+    if (hours <= 6) return 330;
+    if (hours <= 8) return 380;
+    if (hours <= 12) return 480;
+    
+    // If more than 12, add per hour
+    return 480 + (Math.round(hours - 12) * 50);
+  };
+
+  // Effect to automatically calculate price when times change
+  useEffect(() => {
+    if (!startTime || !endTime) return;
+
+    const now = new Date();
+    // Create date objects using a dummy date to compare time difference
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+
+    if (isNaN(startH) || isNaN(endH)) return;
+
+    const startDate = new Date(now);
+    startDate.setHours(startH, startM, 0, 0);
+
+    const endDate = new Date(now);
+    endDate.setHours(endH, endM, 0, 0);
+
+    // Handle overnight (if end time is earlier than start time, assume it's next day)
+    if (endDate <= startDate) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours > 0) {
+      setPrice(calculatePrice(diffHours));
+    }
+  }, [startTime, endTime]);
 
   const handleQuickTime = (hours: number) => {
     const start = new Date();
@@ -69,31 +117,9 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
     
     // Format to HH:MM 24h
     const formatTime = (date: Date) => date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-    setEndTime(formatTime(end));
     
-    // Updated Pricing Logic based on requirements
-    let newPrice = 0;
-    switch (hours) {
-      case 2:
-        newPrice = 220;
-        break;
-      case 4:
-        newPrice = 280;
-        break;
-      case 5:
-        newPrice = 300;
-        break;
-      case 8:
-        newPrice = 330;
-        break;
-      case 12:
-        newPrice = 480;
-        break;
-      default:
-        // Fallback calculation
-        newPrice = 220 + ((hours - 2) * 30);
-    }
-    setPrice(newPrice);
+    setEndTime(formatTime(end));
+    // Price will update via useEffect
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -111,14 +137,13 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
     const checkOutDate = new Date(now);
     checkOutDate.setHours(endH, endM, 0, 0);
 
-    // Handle overnight stays (e.g. Start 23:00, End 01:00)
-    // If checkOut appears to be before checkIn, assume it's the next day
+    // Handle overnight stays
     if (checkOutDate <= checkInDate) {
         checkOutDate.setDate(checkOutDate.getDate() + 1);
     }
 
     onConfirm({
-      clientName: clientName || `Cliente Anónimo`,
+      clientName: clientName || `Habitación ${room.id}`,
       peopleCount,
       entryType,
       vehicleBrand: brand,
@@ -165,7 +190,6 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
                     type="text" 
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    placeholder={`Hab. Habitación ${room.id}`}
                     className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none bg-white transition"
                   />
                 </div>
