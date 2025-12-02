@@ -26,6 +26,9 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
   
   // Local state for quantity inputs on product list rows (productId -> quantity)
   const [rowQuantities, setRowQuantities] = useState<Record<string, number>>({});
+  
+  // State for immediate feedback on specific product rows (productId set)
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   // Reset state when opening
   React.useEffect(() => {
@@ -35,6 +38,7 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
       setCart([]);
       setActiveTab('Bebidas');
       setRowQuantities({});
+      setJustAddedId(null);
     }
   }, [isOpen]);
 
@@ -85,8 +89,10 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
       }];
     });
 
-    // Reset row quantity after adding
+    // Reset row quantity after adding and show feedback
     setRowQuantity(product.id, 1);
+    setJustAddedId(product.id);
+    setTimeout(() => setJustAddedId(null), 1000);
   };
 
   const removeFromCart = (productId: string) => {
@@ -218,6 +224,7 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
                     {filteredProducts.map(product => {
                         const qty = getRowQuantity(product.id);
                         const rowTotal = qty * product.price;
+                        const isAdded = justAddedId === product.id;
 
                         return (
                             <div key={product.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-800/40 border border-slate-700/50 rounded-xl hover:bg-slate-800 hover:border-slate-600 transition group">
@@ -255,9 +262,17 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
                                     {/* Add Button */}
                                     <button 
                                         onClick={() => addToCart(product)}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg shadow-lg shadow-green-900/20 transition active:scale-95 flex items-center gap-2"
+                                        className={`px-4 py-2 font-semibold rounded-lg shadow-lg transition active:scale-95 flex items-center gap-2 min-w-[100px] justify-center ${
+                                            isAdded 
+                                            ? 'bg-white text-green-600 shadow-white/10' 
+                                            : 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20'
+                                        }`}
                                     >
-                                        Agregar
+                                        {isAdded ? (
+                                            <>
+                                                <Check className="w-4 h-4" /> Agregado
+                                            </>
+                                        ) : 'Agregar'}
                                     </button>
                                 </div>
                             </div>
@@ -345,4 +360,4 @@ export const FoodConsumptionModal: React.FC<FoodConsumptionModalProps> = ({
       </div>
     </div>
   );
-};
+}

@@ -1,3 +1,4 @@
+
 export enum RoomStatus {
   AVAILABLE = 'Disponible',
   OCCUPIED = 'Ocupada',
@@ -49,7 +50,8 @@ export interface Employee {
   id: string;
   name: string;
   role: string;
-  status: 'Activo' | 'Descanso';
+  status: 'Activo' | 'Descanso' | 'Baja';
+  joinedDate: Date;
 }
 
 export interface Product {
@@ -70,9 +72,18 @@ export interface ConsumptionItem {
 
 export interface Consumption {
   id: string;
-  roomId: string; // "General" if not attached to a room (e.g. employee or walk-in)
+  roomId?: string; // Optional now, as it could be an employee consumption
+  employeeId?: string; // New field for employee tracking
   items: ConsumptionItem[];
   totalAmount: number;
   timestamp: Date;
-  status: 'Pagado' | 'Pendiente en Habitación';
+  status: 'Pagado' | 'Pendiente en Habitación' | 'Descuento Nómina';
+}
+
+export interface VehicleReport {
+  id: string;
+  plate: string;
+  description: string;
+  date: Date;
+  severity: 'Baja' | 'Media' | 'Alta';
 }

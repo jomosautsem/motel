@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -42,7 +43,10 @@ import { OccupancyModal } from './components/OccupancyModal';
 import { ControlsModal } from './components/ControlsModal';
 import { FoodConsumptionModal } from './components/FoodConsumptionModal';
 import { ProductModal } from './components/ProductModal';
-import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem } from './types';
+import { VehiclesManager } from './components/VehiclesManager';
+import { EmployeesManager } from './components/EmployeesManager'; // Import EmployeesManager
+import { Toast } from './components/Toast';
+import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 
 // --- DATA INITIALIZATION ---
@@ -77,6 +81,10 @@ const INITIAL_ROOMS: Room[] = ROOM_IDS.map(id => {
     status: isOccupied ? RoomStatus.OCCUPIED : RoomStatus.AVAILABLE,
     type: ['9A', '9B'].includes(id) ? 'Jacuzzi' : (parseInt(id) > 15 ? 'Suite' : 'Sencilla'),
     vehiclePlate: isOccupied ? `ABC-${Math.floor(100 + Math.random() * 900)}` : undefined,
+    vehicleBrand: isOccupied ? (Math.random() > 0.5 ? 'Nissan' : 'Chevrolet') : undefined,
+    vehicleModel: isOccupied ? (Math.random() > 0.5 ? 'Versa' : 'Aveo') : undefined,
+    vehicleColor: isOccupied ? (Math.random() > 0.5 ? 'Rojo' : 'Blanco') : undefined,
+    entryType: isOccupied ? (Math.random() > 0.8 ? 'Pie' : Math.random() > 0.8 ? 'Moto' : 'Auto') : undefined,
     clientName: isOccupied ? `Habitación ${id}` : undefined,
     checkInTime: checkIn,
     checkOutTime: checkOut,
@@ -96,6 +104,13 @@ const INITIAL_PRODUCTS: Product[] = [
   { id: '6', name: 'Sandwich Jamón', price: 60, category: 'Cocina', stock: 10 },
   { id: '7', name: 'Kit Pasión', price: 150, category: 'Otro', stock: 15 },
   { id: '8', name: 'Preservativos', price: 50, category: 'Otro', stock: 100 },
+];
+
+const INITIAL_EMPLOYEES: Employee[] = [
+  { id: '1', name: 'Abigail', role: 'Recamarera', status: 'Activo', joinedDate: new Date('2024-01-15') },
+  { id: '2', name: 'Anahi', role: 'Recamarera', status: 'Activo', joinedDate: new Date('2024-03-20') },
+  { id: '3', name: 'Carlos', role: 'Mantenimiento', status: 'Descanso', joinedDate: new Date('2023-11-05') },
+  { id: '4', name: 'Sofia', role: 'Recepcionista', status: 'Activo', joinedDate: new Date('2024-05-01') },
 ];
 
 const CHART_DATA = [
@@ -123,7 +138,13 @@ export default function App() {
   const [consumptions, setConsumptions] = useState<Consumption[]>([]);
   const [foodModalOpen, setFoodModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
+
+  // Vehicle State
+  const [vehicleReports, setVehicleReports] = useState<VehicleReport[]>([]);
   
+  // Employees State
+  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+
   // Shift Management State
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -139,6 +160,9 @@ export default function App() {
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Toast State
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
   // --- HANDLERS & EFFECTS ---
   
   useEffect(() => {
@@ -148,11 +172,6 @@ export default function App() {
 
   const getShiftInfo = () => {
     const hour = currentTime.getHours();
-    
-    // Matutino: 07:00 - 14:00
-    // Vespertino: 14:00 - 21:00
-    // Nocturno: 21:00 - 07:00
-
     if (hour >= 7 && hour < 14) return { name: 'Matutino', icon: Sun, color: 'text-amber-500', bg: 'bg-amber-100' };
     if (hour >= 14 && hour < 21) return { name: 'Vespertino', icon: Sunset, color: 'text-rose-500', bg: 'bg-rose-100' };
     return { name: 'Nocturno', icon: Moon, color: 'text-indigo-500', bg: 'bg-indigo-100' };
@@ -188,6 +207,10 @@ export default function App() {
             status: newStatus,
             clientName: undefined,
             vehiclePlate: undefined,
+            vehicleBrand: undefined,
+            vehicleModel: undefined,
+            vehicleColor: undefined,
+            entryType: undefined,
             checkInTime: undefined,
             checkOutTime: undefined,
             peopleCount: undefined,
@@ -255,6 +278,10 @@ export default function App() {
     }));
 
     setFoodModalOpen(false);
+    setToast({
+      message: `Se agregaron ${items.length} productos a la Habitación ${roomId}.`,
+      type: 'success'
+    });
   };
 
   const handleAddProduct = (newProduct: Omit<Product, 'id'>) => {
@@ -263,6 +290,60 @@ export default function App() {
       id: Date.now().toString()
     };
     setProducts(prev => [...prev, product]);
+    setToast({
+      message: 'Producto añadido al menú correctamente.',
+      type: 'success'
+    });
+  };
+
+  const handleAddVehicleReport = (report: Omit<VehicleReport, 'id' | 'date'>) => {
+    const newReport: VehicleReport = {
+      ...report,
+      id: Date.now().toString(),
+      date: new Date()
+    };
+    setVehicleReports(prev => [newReport, ...prev]);
+    setToast({
+      message: 'Reporte de vehículo registrado exitosamente.',
+      type: 'success'
+    });
+  };
+
+  // --- EMPLOYEE HANDLERS ---
+  const handleAddEmployee = (data: Omit<Employee, 'id' | 'joinedDate'>) => {
+    const newEmployee: Employee = {
+      ...data,
+      id: Date.now().toString(),
+      joinedDate: new Date()
+    };
+    setEmployees(prev => [...prev, newEmployee]);
+    setToast({ message: 'Empleado registrado exitosamente.', type: 'success' });
+  };
+
+  const handleEditEmployee = (id: string, data: Partial<Employee>) => {
+    setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, ...data } : emp));
+    setToast({ message: 'Información de empleado actualizada.', type: 'success' });
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    if (confirm('¿Estás seguro de eliminar este empleado?')) {
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+      setToast({ message: 'Empleado eliminado.', type: 'success' });
+    }
+  };
+
+  const handleAddEmployeeConsumption = (employeeId: string, items: ConsumptionItem[]) => {
+    const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
+    const newConsumption: Consumption = {
+      id: Date.now().toString(),
+      employeeId, // Track it via employee ID
+      items,
+      totalAmount,
+      timestamp: new Date(),
+      status: 'Descuento Nómina'
+    };
+    setConsumptions(prev => [newConsumption, ...prev]);
+    setToast({ message: 'Consumo de empleado registrado.', type: 'success' });
   };
 
   const handleGenerateReport = async () => {
@@ -270,35 +351,42 @@ export default function App() {
     const context = `
       Ingresos Semanales: ${JSON.stringify(CHART_DATA)}
       Estado Actual Habitaciones: ${rooms.filter(r => r.status === RoomStatus.OCCUPIED).length} ocupadas de 21.
-      Habitaciones en Limpieza: ${rooms.filter(r => r.status === RoomStatus.CLEANING).length}.
     `;
     const result = await analyzeBusinessData(context);
     setAiAnalysis(result);
     setIsAnalyzing(false);
   };
 
-  // --- DASHBOARD HELPERS ---
+  // --- DASHBOARD CALCULATIONS ---
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
 
-  // Mock data calculations for Dashboard
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length;
   const activePeopleCount = rooms.reduce((acc, r) => acc + (r.peopleCount || 0), 0);
   
-  // These would typically come from a DB, mocking for UI
+  // Financials
+  // 1. Room Revenue (Hardcoded/Mock for now)
   const roomRevenue = 3250.00;
-  // Calculate real product revenue from consumptions
-  const productRevenue = consumptions.reduce((acc, c) => acc + c.totalAmount, 0);
   
-  const employeeConsumption = 120.00;
+  // 2. Product Revenue (Consumptions attached to rooms)
+  const productRevenue = consumptions
+    .filter(c => !c.employeeId) // Only room consumptions
+    .reduce((acc, c) => acc + c.totalAmount, 0);
+  
+  // 3. Employee Consumption (Consumptions attached to employees)
+  const employeeConsumption = consumptions
+    .filter(c => c.employeeId)
+    .reduce((acc, c) => acc + c.totalAmount, 0);
+  
   const expenses = 450.00;
   const totalShiftRevenue = roomRevenue + productRevenue;
-  const totalGeneral = totalShiftRevenue - expenses; // Simple logic
+  const totalGeneral = totalShiftRevenue - expenses;
 
-  // --- FOOD DASHBOARD STATS ---
-  const foodTotalRevenue = consumptions.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const foodTotalOrders = consumptions.length;
+  // --- FOOD STATS ---
+  const foodConsumptions = consumptions.filter(c => !c.employeeId); // Only client food
+  const foodTotalRevenue = foodConsumptions.reduce((acc, curr) => acc + curr.totalAmount, 0);
+  const foodTotalOrders = foodConsumptions.length;
   const foodAvgTicket = foodTotalOrders > 0 ? foodTotalRevenue / foodTotalOrders : 0;
 
   // --- LOGIN SCREEN ---
@@ -382,6 +470,9 @@ export default function App() {
   return (
     <div className="flex min-h-screen bg-[#FDF2F4]"> {/* Very light rose background */}
       
+      {/* GLOBAL TOAST */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       {/* SIDEBAR */}
       <aside className="w-64 bg-white/80 backdrop-blur-md border-r border-rose-100 fixed h-full z-20 hidden md:flex flex-col">
         <div className="p-8 pb-4">
@@ -700,12 +791,12 @@ export default function App() {
               <div className="lg:col-span-2 bg-slate-800 rounded-2xl p-6 border border-slate-700">
                  <h3 className="text-xl font-bold text-white mb-4">Últimos Consumos Registrados</h3>
                  <div className="space-y-3">
-                   {consumptions.length === 0 ? (
+                   {foodConsumptions.length === 0 ? (
                      <div className="text-center py-12 text-slate-500 italic border-2 border-dashed border-slate-700 rounded-xl">
                        No se han registrado consumos en este turno aún.
                      </div>
                    ) : (
-                     consumptions.map(consumption => (
+                     foodConsumptions.map(consumption => (
                        <div key={consumption.id} className="bg-slate-700/50 p-4 rounded-xl flex justify-between items-center border border-white/5">
                          <div className="flex items-center gap-4">
                            <div className="bg-slate-600 p-2 rounded-lg">
@@ -786,6 +877,32 @@ export default function App() {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* VIEW: VEHICLES */}
+        {currentView === AppView.VEHICLES && (
+          <div className="animate-fade-in bg-slate-50 p-6 rounded-3xl min-h-full">
+            <VehiclesManager 
+              rooms={rooms} 
+              reports={vehicleReports}
+              onAddReport={handleAddVehicleReport}
+            />
+          </div>
+        )}
+
+        {/* VIEW: EMPLOYEES (New Integration) */}
+        {currentView === AppView.EMPLOYEES && (
+          <div className="animate-fade-in bg-slate-50 p-6 rounded-3xl min-h-full">
+             <EmployeesManager 
+               employees={employees}
+               consumptions={consumptions}
+               onAddEmployee={handleAddEmployee}
+               onEditEmployee={handleEditEmployee}
+               onDeleteEmployee={handleDeleteEmployee}
+               onAddConsumption={handleAddEmployeeConsumption}
+               products={products}
+             />
           </div>
         )}
 
@@ -888,11 +1005,9 @@ export default function App() {
         )}
 
         {/* Placeholder Views for other sections */}
-        {![AppView.DASHBOARD, AppView.ROOMS, AppView.REPORTS, AppView.FOOD].includes(currentView) && (
+        {![AppView.DASHBOARD, AppView.ROOMS, AppView.REPORTS, AppView.FOOD, AppView.VEHICLES, AppView.EMPLOYEES].includes(currentView) && (
           <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 bg-slate-50 rounded-3xl min-h-full">
              <div className="bg-slate-100 p-6 rounded-full mb-4">
-               {currentView === AppView.VEHICLES && <Car className="w-12 h-12" />}
-               {currentView === AppView.EMPLOYEES && <Users className="w-12 h-12" />}
                {currentView === AppView.EXPENSES && <Wallet className="w-12 h-12" />}
                {currentView === AppView.TRANSFERS && <ArrowRightLeft className="w-12 h-12" />}
              </div>
