@@ -44,9 +44,10 @@ import { ControlsModal } from './components/ControlsModal';
 import { FoodConsumptionModal } from './components/FoodConsumptionModal';
 import { ProductModal } from './components/ProductModal';
 import { VehiclesManager } from './components/VehiclesManager';
-import { EmployeesManager } from './components/EmployeesManager'; // Import EmployeesManager
+import { EmployeesManager } from './components/EmployeesManager';
+import { ExpensesManager } from './components/ExpensesManager';
 import { Toast } from './components/Toast';
-import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee } from './types';
+import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 
 // --- DATA INITIALIZATION ---
@@ -144,6 +145,9 @@ export default function App() {
   
   // Employees State
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+
+  // Expenses State
+  const [expensesList, setExpensesList] = useState<Expense[]>([]);
 
   // Shift Management State
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -346,6 +350,23 @@ export default function App() {
     setToast({ message: 'Consumo de empleado registrado.', type: 'success' });
   };
 
+  // --- EXPENSE HANDLERS ---
+  const handleAddExpense = (description: string, amount: number) => {
+    const newExpense: Expense = {
+      id: Date.now().toString(),
+      description,
+      amount,
+      date: new Date()
+    };
+    setExpensesList(prev => [newExpense, ...prev]);
+    setToast({ message: 'Gasto registrado correctamente.', type: 'success' });
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    setExpensesList(prev => prev.filter(ex => ex.id !== id));
+    setToast({ message: 'Gasto eliminado.', type: 'success' });
+  };
+
   const handleGenerateReport = async () => {
     setIsAnalyzing(true);
     const context = `
@@ -379,9 +400,11 @@ export default function App() {
     .filter(c => c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  const expenses = 450.00;
+  // 4. Expenses
+  const totalExpenses = expensesList.reduce((acc, curr) => acc + curr.amount, 0);
+  
   const totalShiftRevenue = roomRevenue + productRevenue;
-  const totalGeneral = totalShiftRevenue - expenses;
+  const totalGeneral = totalShiftRevenue - totalExpenses; // Revenue - Expenses
 
   // --- FOOD STATS ---
   const foodConsumptions = consumptions.filter(c => !c.employeeId); // Only client food
@@ -462,584 +485,462 @@ export default function App() {
           : 'text-slate-600 hover:bg-rose-50 hover:text-rose-600'
       }`}
     >
-      <Icon className="w-5 h-5" />
+      <Icon className={`w-5 h-5 ${currentView === view ? 'text-white' : 'text-slate-400'}`} />
       <span className="font-medium">{label}</span>
     </button>
   );
 
   return (
-    <div className="flex min-h-screen bg-[#FDF2F4]"> {/* Very light rose background */}
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* GLOBAL TOAST */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-white/80 backdrop-blur-md border-r border-rose-100 fixed h-full z-20 hidden md:flex flex-col">
-        <div className="p-8 pb-4">
-          <div className="flex items-center gap-3 text-rose-600 mb-2">
-            <Heart className="w-8 h-8 fill-rose-600" />
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">MLB</span>
+      {/* Sidebar */}
+      <aside className="w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col p-6 shadow-sm z-20">
+        <div className="flex items-center gap-3 mb-10 px-2">
+          <div className="w-10 h-10 bg-rose-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
+            <Heart className="w-6 h-6 text-white fill-current" />
           </div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest pl-1">Panel de Control</p>
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 tracking-tight leading-none">Motel las Bolas</h1>
+            <p className="text-xs text-slate-400 font-medium mt-1">Manager V2.0</p>
+          </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 space-y-2">
           <SidebarItem view={AppView.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
           <SidebarItem view={AppView.ROOMS} icon={BedDouble} label="Habitaciones" />
+          <SidebarItem view={AppView.FOOD} icon={Utensils} label="Alimentos y Bebidas" />
           <SidebarItem view={AppView.VEHICLES} icon={Car} label="Vehículos" />
-          <SidebarItem view={AppView.FOOD} icon={Utensils} label="Alimentos" />
-          <SidebarItem view={AppView.REPORTS} icon={FileBarChart} label="Reportes" />
           <SidebarItem view={AppView.EMPLOYEES} icon={Users} label="Empleados" />
-          <SidebarItem view={AppView.EXPENSES} icon={Wallet} label="Gastos" />
-          <SidebarItem view={AppView.TRANSFERS} icon={ArrowRightLeft} label="Transferencias" />
+          <SidebarItem view={AppView.EXPENSES} icon={TrendingDown} label="Gastos" />
+          <SidebarItem view={AppView.REPORTS} icon={FileBarChart} label="Reportes IA" />
         </nav>
 
-        <div className="p-4 border-t border-rose-100">
+        <div className="mt-auto pt-6 border-t border-slate-100">
+          <div className="flex items-center gap-3 px-4 mb-4">
+             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                <Users className="w-5 h-5 text-slate-500" />
+             </div>
+             <div>
+               <p className="text-sm font-bold text-slate-700">Admin</p>
+               <p className="text-xs text-slate-400">Gerente General</p>
+             </div>
+          </div>
           <button 
             onClick={() => setIsAuthenticated(false)}
-            className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-rose-600 transition w-full"
+            className="w-full flex items-center gap-2 text-rose-500 hover:bg-rose-50 px-4 py-3 rounded-xl transition text-sm font-medium"
           >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Cerrar Sesión</span>
+            <LogOut className="w-4 h-4" /> Cerrar Sesión
           </button>
         </div>
       </aside>
 
-      {/* MOBILE HEADER */}
-      <div className="md:hidden fixed top-0 w-full bg-white z-20 border-b p-4 flex justify-between items-center shadow-sm">
-        <span className="font-bold text-lg text-rose-600">Motel las Bolas</span>
-        <button onClick={() => setCurrentView(AppView.DASHBOARD)} className="text-slate-600">
-          <LayoutDashboard />
-        </button>
-      </div>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen bg-slate-900 text-white">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         
-        {/* VIEW: DASHBOARD */}
-        {currentView === AppView.DASHBOARD && (
-          <div className="space-y-6 animate-fade-in max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-4 mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-blue-500 tracking-tight">Dashboard - Motel Las Bolas</h1>
-                <p className="text-slate-400 text-sm mt-1">Bienvenido al panel de control principal.</p>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 ${currentShift.bg} ${currentShift.color} shadow-lg`}>
-                   <currentShift.icon className="w-5 h-5" />
-                   <span>Turno {currentShift.name}</span>
-                </div>
-                <div className="text-right mt-1">
-                  <p className="text-xs text-slate-400 font-mono">{currentShift.name === 'Matutino' ? '07:00 - 14:00' : currentShift.name === 'Vespertino' ? '14:00 - 21:00' : '21:00 - 07:00'}</p>
-                  <p className="text-xs text-slate-500 mt-0.5 capitalize">
-                    {currentTime.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Sub Nav (Visual Only) */}
-            <div className="flex gap-2 mb-6">
-              <button className="px-6 py-2 bg-white text-slate-800 rounded-lg font-semibold shadow-sm text-sm flex items-center gap-2">
-                <LayoutDashboard className="w-4 h-4" /> Vista General
-              </button>
-              <button className="px-6 py-2 bg-slate-800 text-slate-400 rounded-lg font-medium hover:text-white transition text-sm flex items-center gap-2">
-                <History className="w-4 h-4" /> Historial del Turno
-              </button>
-            </div>
-
-            {/* Row 1: Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              {/* Card 1: Occupancy */}
-              <div className="bg-white rounded-xl p-5 text-slate-800 shadow-lg flex justify-between items-center">
-                <div>
-                  <p className="text-slate-500 text-xs font-semibold uppercase">Habitaciones Ocupadas</p>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-bold">{activeRoomCount}</span>
-                    <span className="text-slate-400 font-medium">/ {rooms.length}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">{Math.round((activeRoomCount / rooms.length) * 100)}% Ocupación</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-full text-blue-600">
-                  <BedDouble className="w-6 h-6" />
-                </div>
-              </div>
-
-              {/* Card 2: Current Shift Income */}
-              <div className="bg-white rounded-xl p-5 text-slate-800 shadow-lg flex justify-between items-center">
-                <div>
-                  <p className="text-slate-500 text-xs font-semibold uppercase">Ingresos Turno {currentShift.name}</p>
-                  <div className="mt-1">
-                    <span className="text-2xl font-bold">{formatCurrency(totalShiftRevenue)}</span>
-                  </div>
-                  <p className="text-xs text-green-500 mt-1 font-medium flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Turno en curso
-                  </p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-full text-green-600">
-                  <Clock className="w-6 h-6" />
-                </div>
-              </div>
-
-              {/* Card 3: Active People */}
-              <div className="bg-white rounded-xl p-5 text-slate-800 shadow-lg flex justify-between items-center">
-                <div>
-                  <p className="text-slate-500 text-xs font-semibold uppercase">Personas Activas</p>
-                  <div className="mt-1">
-                    <span className="text-2xl font-bold">{activePeopleCount}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">Huéspedes actuales</p>
-                </div>
-                <div className="bg-indigo-100 p-3 rounded-full text-indigo-600">
-                  <Users className="w-6 h-6" />
-                </div>
-              </div>
-
-               {/* Card 4: Previous Shift Income (Placeholder logic) */}
-               <div className="bg-white rounded-xl p-5 text-slate-800 shadow-lg flex justify-between items-center">
-                <div>
-                  <p className="text-slate-500 text-xs font-semibold uppercase">Ingresos T. Anterior</p>
-                  <div className="mt-1">
-                    <span className="text-2xl font-bold">{formatCurrency(0)}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">Turno finalizado</p>
-                </div>
-                <div className="bg-cyan-100 p-3 rounded-full text-cyan-600">
-                  <DollarSign className="w-6 h-6" />
-                </div>
-              </div>
-            </div>
-
-            {/* DASHBOARD ROOM GRID (New Section) */}
-            <div className="mt-4 p-4 bg-white rounded-2xl shadow-lg border border-slate-200">
-              <h3 className="text-slate-800 font-bold mb-4 flex items-center gap-2">
-                <BedDouble className="w-5 h-5 text-rose-500" />
-                Estado de Habitaciones
-              </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-slate-800">
-                {rooms.map(room => (
-                  <RoomCard 
-                    key={room.id} 
-                    room={room} 
-                    onStatusChange={handleStatusChange} 
-                    variant="compact" // Use new compact variant
-                  />
-                ))}
-              </div>
-
-               {/* Color Legend */}
-               <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-green-500"></div> 2 Horas</div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-orange-500"></div> 4 Horas</div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-yellow-400"></div> 5 Horas</div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-red-600"></div> 8 Horas</div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-blue-600"></div> 12 Horas</div>
-               </div>
-            </div>
-
-            {/* Row 2: Colored Breakdown Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-              
-              {/* Green: Room Revenue */}
-              <div className="bg-emerald-100 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
-                 <div className="absolute -right-4 -top-4 bg-emerald-200/50 w-24 h-24 rounded-full group-hover:scale-110 transition-transform"></div>
-                 <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm z-10">
-                    <BedDouble className="w-4 h-4" />
-                    Ingresos por Habitaciones
-                 </div>
-                 <div className="text-right z-10">
-                    <span className="text-2xl font-bold text-emerald-900">{formatCurrency(roomRevenue)}</span>
-                 </div>
-              </div>
-
-              {/* Purple: Consumables Revenue */}
-              <div className="bg-purple-100 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
-                 <div className="absolute -right-4 -top-4 bg-purple-200/50 w-24 h-24 rounded-full group-hover:scale-110 transition-transform"></div>
-                 <div className="flex items-center gap-2 text-purple-800 font-semibold text-sm z-10">
-                    <ShoppingCart className="w-4 h-4" />
-                    Ingresos por Consumos
-                 </div>
-                 <div className="text-right z-10">
-                    <span className="text-2xl font-bold text-purple-900">{formatCurrency(productRevenue)}</span>
-                 </div>
-              </div>
-
-              {/* Orange: Employee Consumables */}
-              <div className="bg-orange-100 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
-                 <div className="absolute -right-4 -top-4 bg-orange-200/50 w-24 h-24 rounded-full group-hover:scale-110 transition-transform"></div>
-                 <div className="flex items-center gap-2 text-orange-800 font-semibold text-sm z-10">
-                    <Users className="w-4 h-4" />
-                    Consumos de Empleados
-                 </div>
-                 <div className="text-right z-10">
-                    <span className="text-2xl font-bold text-orange-900">{formatCurrency(employeeConsumption)}</span>
-                 </div>
-              </div>
-
-               {/* Red: Expenses */}
-               <div className="bg-rose-100 rounded-xl p-5 flex flex-col justify-between h-32 relative overflow-hidden group">
-                 <div className="absolute -right-4 -top-4 bg-rose-200/50 w-24 h-24 rounded-full group-hover:scale-110 transition-transform"></div>
-                 <div className="flex items-center gap-2 text-rose-800 font-semibold text-sm z-10">
-                    <TrendingDown className="w-4 h-4" />
-                    Gastos
-                 </div>
-                 <div className="text-right z-10">
-                    <span className="text-2xl font-bold text-rose-900">{formatCurrency(expenses)}</span>
-                 </div>
-              </div>
-            </div>
-
-            {/* Row 3: Total Bar */}
-            <div className="bg-blue-600 rounded-xl p-4 flex justify-between items-center text-white shadow-lg">
-               <div className="flex items-center gap-3">
-                 <DollarSign className="w-6 h-6 opacity-80" />
-                 <span className="font-bold text-lg">Total General del Turno</span>
-               </div>
-               <span className="text-3xl font-bold tracking-tight">{formatCurrency(totalGeneral)}</span>
-            </div>
-
-          </div>
-        )}
-
-        {/* VIEW: FOOD & BEVERAGES */}
-        {currentView === AppView.FOOD && (
-          <div className="animate-fade-in space-y-8 bg-slate-900 min-h-full">
+        {/* Header */}
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold text-slate-800">{currentView}</h2>
             
-            {/* Header with Title and Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/10 pb-6">
-              <div>
-                <h2 className="text-4xl font-extrabold text-orange-500 tracking-tight">Gestión de Alimentos y Bebidas</h2>
-                <p className="text-slate-400 mt-2">Control de inventario, menú y registro de consumos a habitaciones.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={() => setProductModalOpen(true)}
-                  className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-semibold hover:bg-slate-700 transition flex items-center gap-2"
-                >
-                  <Package className="w-4 h-4" /> Añadir/Editar Menú
-                </button>
-                <button className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-semibold hover:bg-slate-700 transition flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" /> Gestionar Tipos
-                </button>
-                <button className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-semibold hover:bg-slate-700 transition flex items-center gap-2">
-                  <Search className="w-4 h-4" /> Gestionar Categorías
-                </button>
-                <button 
-                  onClick={() => setFoodModalOpen(true)}
-                  className="px-6 py-2 bg-orange-600 rounded-lg text-white font-bold hover:bg-orange-700 shadow-lg shadow-orange-900/20 transition flex items-center gap-2"
-                >
-                  <ShoppingCart className="w-5 h-5" /> Registrar Consumo
-                </button>
-              </div>
+            {/* Shift Badge */}
+            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${currentShift.bg} ${currentShift.color} border-current/20`}>
+              <currentShift.icon className="w-3.5 h-3.5" />
+              <span>Turno {currentShift.name}</span>
             </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              
-              {/* Card: Products in Menu */}
-              <div className="bg-white rounded-2xl p-6 text-slate-800 flex items-center gap-4 shadow-lg">
-                <div className="bg-blue-100 p-4 rounded-xl text-blue-600">
-                  <Package className="w-8 h-8" />
-                </div>
-                <div>
-                   <p className="text-slate-500 font-medium">Productos en Menú</p>
-                   <p className="text-3xl font-bold">{products.length}</p>
-                </div>
-              </div>
-
-              {/* Card: Registered Consumptions */}
-              <div className="bg-white rounded-2xl p-6 text-slate-800 flex items-center gap-4 shadow-lg">
-                <div className="bg-green-100 p-4 rounded-xl text-green-600">
-                  <ShoppingCart className="w-8 h-8" />
-                </div>
-                <div>
-                   <p className="text-slate-500 font-medium">Consumos Registrados</p>
-                   <p className="text-3xl font-bold">{foodTotalOrders}</p>
-                </div>
-              </div>
-
-              {/* Card: Total Revenue */}
-              <div className="bg-white rounded-2xl p-6 text-slate-800 flex items-center gap-4 shadow-lg">
-                <div className="bg-orange-100 p-4 rounded-xl text-orange-600">
-                  <Coffee className="w-8 h-8" />
-                </div>
-                <div>
-                   <p className="text-slate-500 font-medium">Ingresos Totales</p>
-                   <p className="text-3xl font-bold">{formatCurrency(foodTotalRevenue)}</p>
-                </div>
-              </div>
-
-              {/* Card: Avg Ticket */}
-              <div className="bg-white rounded-2xl p-6 text-slate-800 flex items-center gap-4 shadow-lg">
-                <div className="bg-purple-100 p-4 rounded-xl text-purple-600">
-                  <Receipt className="w-8 h-8" />
-                </div>
-                <div>
-                   <p className="text-slate-500 font-medium">Promedio / Consumo</p>
-                   <p className="text-3xl font-bold">{formatCurrency(foodAvgTicket)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Consumptions & Menu View */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Recent Activity */}
-              <div className="lg:col-span-2 bg-slate-800 rounded-2xl p-6 border border-slate-700">
-                 <h3 className="text-xl font-bold text-white mb-4">Últimos Consumos Registrados</h3>
-                 <div className="space-y-3">
-                   {foodConsumptions.length === 0 ? (
-                     <div className="text-center py-12 text-slate-500 italic border-2 border-dashed border-slate-700 rounded-xl">
-                       No se han registrado consumos en este turno aún.
-                     </div>
-                   ) : (
-                     foodConsumptions.map(consumption => (
-                       <div key={consumption.id} className="bg-slate-700/50 p-4 rounded-xl flex justify-between items-center border border-white/5">
-                         <div className="flex items-center gap-4">
-                           <div className="bg-slate-600 p-2 rounded-lg">
-                             <Utensils className="w-5 h-5 text-orange-400" />
-                           </div>
-                           <div>
-                             <p className="font-bold text-white">Habitación {consumption.roomId}</p>
-                             <p className="text-sm text-slate-400">
-                               {consumption.items.map(i => `${i.quantity}x ${i.productName}`).join(', ')}
-                             </p>
-                           </div>
-                         </div>
-                         <div className="text-right">
-                            <p className="text-xl font-bold text-green-400">+{formatCurrency(consumption.totalAmount)}</p>
-                            <p className="text-xs text-slate-500">{consumption.timestamp.toLocaleTimeString()}</p>
-                         </div>
-                       </div>
-                     ))
-                   )}
-                 </div>
-              </div>
-
-              {/* Quick Menu View */}
-              <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 flex flex-col">
-                 <h3 className="text-xl font-bold text-white mb-4">Menú Rápido</h3>
-                 <div className="flex-1 overflow-y-auto pr-2 space-y-2 max-h-[400px]">
-                   {products.map(product => (
-                     <div key={product.id} className="flex justify-between items-center p-3 bg-slate-700/30 rounded-lg hover:bg-slate-700 transition">
-                       <div>
-                         <p className="font-medium text-slate-200">{product.name}</p>
-                         <span className="text-xs bg-slate-600 px-2 py-0.5 rounded-full text-slate-300">{product.category}</span>
-                       </div>
-                       <span className="font-bold text-orange-400">${product.price}</span>
-                     </div>
-                   ))}
-                 </div>
-              </div>
-
-            </div>
-
           </div>
-        )}
 
-        {/* VIEW: ROOMS */}
-        {currentView === AppView.ROOMS && (
-          <div className="animate-fade-in bg-slate-50 p-6 rounded-3xl min-h-full">
-             <header className="mb-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-3xl font-bold text-slate-800">Habitaciones</h2>
-                <p className="text-slate-500">Gestión de estado en tiempo real</p>
-              </div>
-              <div className="flex gap-2">
-                <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200 text-xs text-slate-600">
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span> 2h
-                </div>
-                 <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200 text-xs text-slate-600">
-                  <span className="w-2 h-2 rounded-full bg-orange-500"></span> 4h
-                </div>
-                 <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200 text-xs text-slate-600">
-                  <span className="w-2 h-2 rounded-full bg-yellow-400"></span> 5h
-                </div>
-                 <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200 text-xs text-slate-600">
-                  <span className="w-2 h-2 rounded-full bg-red-600"></span> 8h
-                </div>
-                 <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200 text-xs text-slate-600">
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span> 12h
-                </div>
-              </div>
-            </header>
+          <div className="flex items-center gap-6">
+            <div className="text-right hidden sm:block">
+              <p className="text-2xl font-bold text-slate-800 font-mono tracking-tight">
+                {currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              </p>
+              <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                {currentTime.toLocaleDateString([], {weekday: 'long', day:'numeric', month:'long'})}
+              </p>
+            </div>
+            
+            <button className="relative p-2 text-slate-400 hover:text-slate-600 transition">
+              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            </button>
+          </div>
+        </header>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Scrollable View Area */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 relative">
+          
+          {/* Dashboard View */}
+          {currentView === AppView.DASHBOARD && (
+            <div className="space-y-8 animate-fade-in">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Occupancy */}
+                <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-white/10 transition"></div>
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-white/10 rounded-xl">
+                        <BedDouble className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">
+                        {Math.round((activeRoomCount / rooms.length) * 100)}% Ocupación
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm font-medium">Habitaciones Ocupadas</p>
+                    <p className="text-4xl font-bold mt-1 tracking-tight">{activeRoomCount} <span className="text-xl text-slate-500 font-normal">/ {rooms.length}</span></p>
+                  </div>
+                </div>
+
+                {/* Current Shift Revenue */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 group hover:border-blue-200 transition">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition">
+                        <Clock className="w-6 h-6" />
+                      </div>
+                   </div>
+                   <p className="text-slate-500 text-sm font-medium">Ingresos Turno {currentShift.name}</p>
+                   <p className="text-3xl font-bold text-slate-800 mt-1">{formatCurrency(totalShiftRevenue)}</p>
+                   <p className="text-xs text-blue-500 font-medium mt-1">Turno en curso</p>
+                </div>
+
+                {/* Active People */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 group hover:border-purple-200 transition">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-purple-50 rounded-xl text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition">
+                        <Users className="w-6 h-6" />
+                      </div>
+                   </div>
+                   <p className="text-slate-500 text-sm font-medium">Personas Activas</p>
+                   <p className="text-3xl font-bold text-slate-800 mt-1">{activePeopleCount}</p>
+                   <p className="text-xs text-purple-500 font-medium mt-1">Huéspedes actuales</p>
+                </div>
+
+                {/* Previous Shift (Mock) */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 opacity-60 hover:opacity-100 transition">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="p-3 bg-slate-50 rounded-xl text-slate-500">
+                        <DollarSign className="w-6 h-6" />
+                      </div>
+                   </div>
+                   <p className="text-slate-500 text-sm font-medium">Ingresos Turno Anterior</p>
+                   <p className="text-3xl font-bold text-slate-800 mt-1">$0.00</p>
+                   <p className="text-xs text-slate-400 font-medium mt-1">Turno finalizado</p>
+                </div>
+              </div>
+
+              {/* Financial Breakdown Row */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                 <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex flex-col justify-between h-24">
+                    <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
+                       <BedDouble className="w-4 h-4" /> Ingresos por Habitaciones
+                    </div>
+                    <p className="text-2xl font-bold text-green-800 text-right">{formatCurrency(roomRevenue)}</p>
+                 </div>
+                 
+                 <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex flex-col justify-between h-24">
+                    <div className="flex items-center gap-2 text-purple-700 font-bold text-sm">
+                       <ShoppingCart className="w-4 h-4" /> Ingresos por Consumos
+                    </div>
+                    <p className="text-2xl font-bold text-purple-800 text-right">{formatCurrency(productRevenue)}</p>
+                 </div>
+
+                 <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col justify-between h-24">
+                    <div className="flex items-center gap-2 text-orange-700 font-bold text-sm">
+                       <Users className="w-4 h-4" /> Consumos de Empleados
+                    </div>
+                    <p className="text-2xl font-bold text-orange-800 text-right">{formatCurrency(employeeConsumption)}</p>
+                 </div>
+
+                 <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 flex flex-col justify-between h-24">
+                    <div className="flex items-center gap-2 text-rose-700 font-bold text-sm">
+                       <TrendingDown className="w-4 h-4" /> Gastos
+                    </div>
+                    <p className="text-2xl font-bold text-rose-800 text-right">{formatCurrency(totalExpenses)}</p>
+                 </div>
+              </div>
+
+              {/* Total Banner */}
+              <div className="bg-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-500/30 flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                   <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
+                     <DollarSign className="w-6 h-6" />
+                   </div>
+                   <h3 className="text-xl font-bold">Total General del Turno</h3>
+                 </div>
+                 <p className="text-4xl font-bold font-mono tracking-tight">{formatCurrency(totalGeneral)}</p>
+              </div>
+
+              {/* Compact Room Grid */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <BedDouble className="w-5 h-5 text-rose-500" />
+                  Estado Rápido de Habitaciones
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {rooms.map(room => (
+                    <RoomCard 
+                      key={room.id} 
+                      room={room} 
+                      onStatusChange={handleStatusChange} 
+                      variant="compact"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rooms View */}
+          {currentView === AppView.ROOMS && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
               {rooms.map(room => (
                 <RoomCard 
                   key={room.id} 
                   room={room} 
-                  onStatusChange={handleStatusChange} 
+                  onStatusChange={handleStatusChange}
                   onOpenControls={handleOpenControls}
                 />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* VIEW: VEHICLES */}
-        {currentView === AppView.VEHICLES && (
-          <div className="animate-fade-in bg-slate-50 p-6 rounded-3xl min-h-full">
+          {/* Vehicles View */}
+          {currentView === AppView.VEHICLES && (
             <VehiclesManager 
-              rooms={rooms} 
+              rooms={rooms}
               reports={vehicleReports}
               onAddReport={handleAddVehicleReport}
             />
-          </div>
-        )}
+          )}
 
-        {/* VIEW: EMPLOYEES (New Integration) */}
-        {currentView === AppView.EMPLOYEES && (
-          <div className="animate-fade-in bg-slate-50 p-6 rounded-3xl min-h-full">
-             <EmployeesManager 
-               employees={employees}
-               consumptions={consumptions}
-               onAddEmployee={handleAddEmployee}
-               onEditEmployee={handleEditEmployee}
-               onDeleteEmployee={handleDeleteEmployee}
-               onAddConsumption={handleAddEmployeeConsumption}
-               products={products}
-             />
-          </div>
-        )}
+          {/* Employees View */}
+          {currentView === AppView.EMPLOYEES && (
+            <EmployeesManager 
+              employees={employees}
+              consumptions={consumptions}
+              onAddEmployee={handleAddEmployee}
+              onEditEmployee={handleEditEmployee}
+              onDeleteEmployee={handleDeleteEmployee}
+              onAddConsumption={handleAddEmployeeConsumption}
+              products={products}
+            />
+          )}
 
-        {/* VIEW: REPORTS */}
-        {currentView === AppView.REPORTS && (
-          <div className="animate-fade-in space-y-8 bg-slate-50 p-6 rounded-3xl min-h-full">
-            <header className="mb-6 flex justify-between items-end">
-              <div>
-                <h2 className="text-3xl font-bold text-slate-800">Reportes Financieros</h2>
-                <p className="text-slate-500">Análisis detallado de rendimiento</p>
+          {/* Expenses View */}
+          {currentView === AppView.EXPENSES && (
+            <ExpensesManager 
+              expenses={expensesList}
+              onAddExpense={handleAddExpense}
+              onDeleteExpense={handleDeleteExpense}
+            />
+          )}
+
+          {/* Food View */}
+          {currentView === AppView.FOOD && (
+            <div className="space-y-8 animate-fade-in">
+              
+              {/* Header Actions */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0f172a] p-6 rounded-2xl shadow-lg border border-slate-700">
+                <div>
+                   <h2 className="text-2xl font-bold text-rose-500">Gestión de Alimentos y Bebidas</h2>
+                   <p className="text-slate-400 text-sm">Control de inventario y ventas</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => setProductModalOpen(true)}
+                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Package className="w-4 h-4" /> Añadir/Editar Menú
+                  </button>
+                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 text-sm font-medium">
+                    <BoxIcon className="w-4 h-4" /> Gestionar Tipos
+                  </button>
+                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 text-sm font-medium">
+                     <Users className="w-4 h-4" /> Gestionar Categorías
+                  </button>
+                  <button 
+                    onClick={() => setFoodModalOpen(true)}
+                    className="px-6 py-2.5 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 shadow-lg shadow-rose-900/30 transition flex items-center gap-2 text-sm"
+                  >
+                    <ShoppingCart className="w-4 h-4" /> Registrar Consumo
+                  </button>
+                </div>
               </div>
-            </header>
 
-            {/* AI Insight Section */}
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-8 opacity-10">
-                 <Bot className="w-32 h-32" />
-               </div>
-               
-               <div className="relative z-10">
-                 <div className="flex items-center gap-3 mb-4">
-                   <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                     <Sparkles className="w-6 h-6 text-yellow-300" />
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                   <div className="bg-blue-100 p-3 rounded-xl text-blue-600">
+                     <Package className="w-6 h-6" />
                    </div>
-                   <h3 className="text-xl font-bold">Asistente Inteligente MLB</h3>
+                   <div>
+                     <p className="text-slate-500 text-xs uppercase font-bold">Productos en Menú</p>
+                     <p className="text-2xl font-bold text-slate-800">{products.length}</p>
+                   </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                   <div className="bg-green-100 p-3 rounded-xl text-green-600">
+                     <ShoppingCart className="w-6 h-6" />
+                   </div>
+                   <div>
+                     <p className="text-slate-500 text-xs uppercase font-bold">Consumos Registrados</p>
+                     <p className="text-2xl font-bold text-slate-800">{foodTotalOrders}</p>
+                   </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                   <div className="bg-orange-100 p-3 rounded-xl text-orange-600">
+                     <Coffee className="w-6 h-6" />
+                   </div>
+                   <div>
+                     <p className="text-slate-500 text-xs uppercase font-bold">Ingresos Totales</p>
+                     <p className="text-2xl font-bold text-slate-800">{formatCurrency(foodTotalRevenue)}</p>
+                   </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                   <div className="bg-purple-100 p-3 rounded-xl text-purple-600">
+                     <Utensils className="w-6 h-6" />
+                   </div>
+                   <div>
+                     <p className="text-slate-500 text-xs uppercase font-bold">Promedio / Consumo</p>
+                     <p className="text-2xl font-bold text-slate-800">{formatCurrency(foodAvgTicket)}</p>
+                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 {/* Menu List */}
+                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                       <h3 className="font-bold text-slate-800">Menú Actual</h3>
+                       <div className="text-xs text-slate-500">
+                         {products.filter(p => p.category === 'Bebida').length} Bebidas • {products.filter(p => p.category !== 'Bebida').length} Alimentos/Otros
+                       </div>
+                    </div>
+                    <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+                      {products.map(product => (
+                        <div key={product.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition">
+                           <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold ${
+                                product.category === 'Bebida' ? 'bg-blue-400' : 
+                                product.category === 'Snack' ? 'bg-orange-400' : 
+                                product.category === 'Cocina' ? 'bg-rose-400' : 'bg-slate-400'
+                              }`}>
+                                {product.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">{product.name}</p>
+                                <p className="text-xs text-slate-400 uppercase font-semibold">{product.category}</p>
+                              </div>
+                           </div>
+                           <div className="text-right">
+                              <p className="font-bold text-green-600">${product.price}</p>
+                              <p className="text-xs text-slate-400">Stock: {product.stock}</p>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
                  </div>
-                 
-                 {!aiAnalysis ? (
-                   <div className="max-w-xl">
-                     <p className="text-indigo-100 mb-6">
-                       Utiliza nuestra IA integrada para analizar patrones de ocupación, sugerir ajustes de precios y detectar anomalías en los gastos de esta semana.
-                     </p>
-                     <button 
-                       onClick={handleGenerateReport}
-                       disabled={isAnalyzing}
-                       className="px-6 py-3 bg-white text-indigo-700 font-bold rounded-xl hover:bg-indigo-50 transition shadow-lg disabled:opacity-70 flex items-center gap-2"
-                     >
-                       {isAnalyzing ? (
-                         <>
-                           <span className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full"></span>
-                           Analizando datos...
-                         </>
+
+                 {/* Recent Activity */}
+                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <h3 className="font-bold text-slate-800 mb-4">Últimos Consumos</h3>
+                    <div className="space-y-4">
+                       {foodConsumptions.length === 0 ? (
+                         <div className="text-center text-slate-400 text-sm py-10">
+                           No hay actividad reciente.
+                         </div>
                        ) : (
-                         <>
-                           <Bot className="w-5 h-5" />
-                           Generar Análisis Ahora
-                         </>
+                         foodConsumptions.slice(0, 6).map(consumption => (
+                           <div key={consumption.id} className="flex items-start gap-3 pb-3 border-b border-slate-50 last:border-0 last:pb-0">
+                              <div className="bg-green-100 p-2 rounded-full text-green-600 mt-1">
+                                <Receipt className="w-3 h-3" />
+                              </div>
+                              <div className="flex-1">
+                                 <div className="flex justify-between">
+                                    <p className="font-bold text-slate-800 text-sm">Habitación {consumption.roomId}</p>
+                                    <p className="font-bold text-green-600 text-sm">${consumption.totalAmount}</p>
+                                 </div>
+                                 <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                                   {consumption.items.map(i => `${i.quantity} ${i.productName}`).join(', ')}
+                                 </p>
+                                 <p className="text-[10px] text-slate-400 mt-1">
+                                   {consumption.timestamp.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                 </p>
+                              </div>
+                           </div>
+                         ))
                        )}
-                     </button>
-                   </div>
-                 ) : (
-                   <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 animate-fade-in">
-                     <h4 className="font-bold text-lg mb-2 text-yellow-300">Resumen Ejecutivo</h4>
-                     <p className="text-white/90 whitespace-pre-line leading-relaxed text-sm">
-                       {aiAnalysis}
-                     </p>
-                     <button 
-                       onClick={() => setAiAnalysis('')}
-                       className="mt-4 text-xs text-white/60 hover:text-white underline"
-                     >
-                       Generar nuevo reporte
-                     </button>
-                   </div>
-                 )}
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-4">Tendencia de Ingresos</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={CHART_DATA}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <Tooltip contentStyle={{borderRadius: '8px'}} />
-                      <Line type="monotone" dataKey="ingresos" stroke="#e11d48" strokeWidth={3} dot={{r: 4, fill: '#e11d48'}} activeDot={{r: 6}} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                    </div>
+                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                 <h3 className="font-bold text-slate-800 mb-4">Porcentaje de Ocupación</h3>
-                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={CHART_DATA}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px'}} />
-                      <Bar dataKey="ocupacion" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={30} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Placeholder Views for other sections */}
-        {![AppView.DASHBOARD, AppView.ROOMS, AppView.REPORTS, AppView.FOOD, AppView.VEHICLES, AppView.EMPLOYEES].includes(currentView) && (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400 bg-slate-50 rounded-3xl min-h-full">
-             <div className="bg-slate-100 p-6 rounded-full mb-4">
-               {currentView === AppView.EXPENSES && <Wallet className="w-12 h-12" />}
-               {currentView === AppView.TRANSFERS && <ArrowRightLeft className="w-12 h-12" />}
+          {/* Report View */}
+          {currentView === AppView.REPORTS && (
+             <div className="flex flex-col items-center justify-center min-h-[500px] text-center space-y-6">
+                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-2xl w-full border border-slate-100">
+                  <div className="w-20 h-20 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 mx-auto mb-6">
+                    <Bot className="w-10 h-10 text-white" />
+                  </div>
+                  <h2 className="text-3xl font-bold text-slate-800 mb-2">Análisis Inteligente</h2>
+                  <p className="text-slate-500 mb-8">
+                    Obtenga insights poderosos sobre el rendimiento de su negocio impulsados por IA.
+                  </p>
+                  
+                  {aiAnalysis ? (
+                    <div className="bg-slate-50 p-6 rounded-2xl text-left border border-slate-200 mb-6">
+                      <div className="prose prose-slate max-w-none text-sm">
+                        <p className="whitespace-pre-line text-slate-700 leading-relaxed">{aiAnalysis}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-4 bg-slate-100 rounded-full w-3/4 mx-auto mb-6 opacity-0"></div>
+                  )}
+
+                  <button 
+                    onClick={handleGenerateReport}
+                    disabled={isAnalyzing}
+                    className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Sparkles className="w-5 h-5 animate-spin" /> Analizando datos...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" /> Generar Reporte con IA
+                      </>
+                    )}
+                  </button>
+                </div>
              </div>
-             <h2 className="text-2xl font-bold text-slate-700 mb-2">{currentView}</h2>
-             <p>Módulo en construcción para la versión 1.1</p>
-          </div>
-        )}
+          )}
 
+        </div>
       </main>
 
-      {/* MODAL OCCUPANCY */}
+      {/* MODALS */}
       {selectedRoomForOccupancy && (
         <OccupancyModal 
-          isOpen={occupancyModalOpen} 
-          room={selectedRoomForOccupancy} 
+          room={selectedRoomForOccupancy}
+          isOpen={occupancyModalOpen}
           onClose={() => setOccupancyModalOpen(false)}
           onConfirm={handleConfirmOccupancy}
         />
       )}
 
-      {/* MODAL CONTROLS */}
       {selectedRoomForControls && (
         <ControlsModal
-          isOpen={controlsModalOpen}
           room={selectedRoomForControls}
+          isOpen={controlsModalOpen}
           onClose={() => setControlsModalOpen(false)}
           onSave={handleSaveControls}
         />
       )}
 
-      {/* MODAL FOOD CONSUMPTION */}
-      <FoodConsumptionModal 
+      <FoodConsumptionModal
         isOpen={foodModalOpen}
         onClose={() => setFoodModalOpen(false)}
         occupiedRooms={rooms.filter(r => r.status === RoomStatus.OCCUPIED)}
@@ -1047,12 +948,26 @@ export default function App() {
         onConfirm={handleAddConsumption}
       />
 
-      {/* MODAL NEW PRODUCT */}
       <ProductModal 
         isOpen={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         onSave={handleAddProduct}
       />
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
+        />
+      )}
+
     </div>
   );
 }
+
+// Helper Icon for Box
+const BoxIcon = (props: any) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+);
