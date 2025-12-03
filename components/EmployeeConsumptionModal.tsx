@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Search, ShoppingCart, Plus, Minus, Check, User } from 'lucide-react';
+import { X, Search, ShoppingCart, Plus, Minus, Check, User, Edit2 } from 'lucide-react';
 import { Employee, Product, ConsumptionItem } from '../types';
 
 interface EmployeeConsumptionModalProps {
@@ -71,6 +70,18 @@ export const EmployeeConsumptionModal: React.FC<EmployeeConsumptionModalProps> =
     }));
   };
 
+  const updatePrice = (productId: string, newPrice: string) => {
+    const priceValue = parseFloat(newPrice);
+    if (isNaN(priceValue) || priceValue < 0) return;
+
+    setCart(prev => prev.map(item => {
+      if (item.productId === productId) {
+        return { ...item, unitPrice: priceValue, total: item.quantity * priceValue };
+      }
+      return item;
+    }));
+  };
+
   const totalAmount = cart.reduce((acc, item) => acc + item.total, 0);
 
   const handleSubmit = () => {
@@ -110,7 +121,7 @@ export const EmployeeConsumptionModal: React.FC<EmployeeConsumptionModalProps> =
                    <select 
                       value={selectedEmployeeId}
                       onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                      disabled={!!preSelectedEmployeeId}
+                      // Remove disabled prop to allow changing employee
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-blue-500 bg-white"
                    >
                      <option value="">-- Seleccionar --</option>
@@ -165,10 +176,10 @@ export const EmployeeConsumptionModal: React.FC<EmployeeConsumptionModalProps> =
           </div>
 
           {/* Right: Cart Summary */}
-          <div className="w-[320px] bg-white flex flex-col z-10 shadow-xl">
+          <div className="w-[340px] bg-white flex flex-col z-10 shadow-xl">
              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                 <ShoppingCart className="w-4 h-4" /> Resumen
+                 <ShoppingCart className="w-4 h-4" /> Resumen y Precios
                </h3>
              </div>
              
@@ -179,14 +190,34 @@ export const EmployeeConsumptionModal: React.FC<EmployeeConsumptionModalProps> =
                  </div>
                ) : (
                  cart.map(item => (
-                   <div key={item.productId} className="flex justify-between items-start text-sm">
-                     <div className="flex-1">
-                       <p className="text-slate-800 font-medium">{item.productName}</p>
-                       <p className="text-xs text-slate-500">{item.quantity} x ${item.unitPrice}</p>
+                   <div key={item.productId} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                     <div className="flex justify-between items-start text-sm">
+                       <div className="flex-1">
+                         <p className="text-slate-800 font-medium">{item.productName}</p>
+                         <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                           <span>Cant: {item.quantity}</span>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <p className="font-bold text-slate-800">${item.total.toFixed(2)}</p>
+                         <button onClick={() => removeFromCart(item.productId)} className="text-[10px] text-rose-500 hover:underline">Eliminar</button>
+                       </div>
                      </div>
-                     <div className="text-right">
-                       <p className="font-bold text-slate-800">${item.total}</p>
-                       <button onClick={() => removeFromCart(item.productId)} className="text-[10px] text-rose-500 hover:underline">Eliminar</button>
+                     
+                     {/* Custom Price Input */}
+                     <div className="flex items-center gap-2 pt-2 border-t border-slate-200 mt-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Precio Unitario:</label>
+                        <div className="flex-1 relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                          <input 
+                            type="number" 
+                            min="0"
+                            step="0.50"
+                            value={item.unitPrice}
+                            onChange={(e) => updatePrice(item.productId, e.target.value)}
+                            className="w-full pl-5 pr-2 py-1 text-xs border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-semibold text-slate-700"
+                          />
+                        </div>
                      </div>
                    </div>
                  ))
@@ -195,8 +226,8 @@ export const EmployeeConsumptionModal: React.FC<EmployeeConsumptionModalProps> =
 
              <div className="p-4 border-t border-slate-100 bg-slate-50">
                <div className="flex justify-between items-center mb-4">
-                 <span className="text-slate-500 font-medium">Total</span>
-                 <span className="text-2xl font-bold text-slate-800">${totalAmount}</span>
+                 <span className="text-slate-500 font-medium">Total a Cargo</span>
+                 <span className="text-2xl font-bold text-slate-800">${totalAmount.toFixed(2)}</span>
                </div>
                <button 
                  onClick={handleSubmit}

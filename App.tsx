@@ -407,7 +407,16 @@ export default function App() {
   const handleDeleteEmployee = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar este empleado?')) {
       const { error } = await supabase.from('employees').delete().eq('id', id);
-      if (!error) {
+      
+      if (error) {
+        console.error("Error deleting employee:", error);
+        // Postgres foreign key violation code: 23503
+        if (error.code === '23503') {
+           setToast({ message: "No se puede eliminar: El empleado tiene historial de ventas.", type: 'error' });
+        } else {
+           setToast({ message: "Error al eliminar empleado.", type: 'error' });
+        }
+      } else {
         fetchData();
         setToast({ message: 'Empleado eliminado.', type: 'success' });
       }
