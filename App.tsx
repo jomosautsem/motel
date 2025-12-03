@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -7,37 +6,21 @@ import {
   Utensils, 
   FileBarChart, 
   Users, 
-  Wallet, 
-  ArrowRightLeft, 
   LogOut, 
   Heart,
-  Search,
   Bot,
   Sparkles,
   Sun,
   Moon,
   Sunset,
-  History,
   ShoppingCart,
   TrendingDown,
   Clock,
   DollarSign,
   Package,
   Receipt,
-  Coffee,
-  Plus
+  Coffee
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line 
-} from 'recharts';
 import { RoomCard } from './components/RoomCard';
 import { OccupancyModal } from './components/OccupancyModal';
 import { ControlsModal } from './components/ControlsModal';
@@ -49,130 +32,165 @@ import { ExpensesManager } from './components/ExpensesManager';
 import { Toast } from './components/Toast';
 import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense } from './types';
 import { analyzeBusinessData } from './services/geminiService';
+import { supabase } from './supabaseClient';
 
-// --- DATA INITIALIZATION ---
-const ROOM_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9A", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
-
-// Helper to create date from now + hours
+// Helper to create date from now + hours (kept for logic util, not data source)
 const createTime = (hoursFromNow: number) => {
   const d = new Date();
   d.setHours(d.getHours() + hoursFromNow);
   return d;
 }
 
-const INITIAL_ROOMS: Room[] = ROOM_IDS.map(id => {
-  const isOccupied = Math.random() > 0.5;
-  
-  // Assign random durations to show off the colors
-  let checkIn, checkOut, duration;
-  if (isOccupied) {
-    const rand = Math.random();
-    if (rand < 0.2) duration = 2; // Green
-    else if (rand < 0.4) duration = 4; // Orange
-    else if (rand < 0.6) duration = 5; // Yellow
-    else if (rand < 0.8) duration = 8; // Red
-    else duration = 12; // Blue
-
-    checkIn = createTime(-1); // Started 1 hour ago
-    checkOut = createTime(duration - 1);
-  }
-
-  return {
-    id,
-    status: isOccupied ? RoomStatus.OCCUPIED : RoomStatus.AVAILABLE,
-    type: ['9A', '9B'].includes(id) ? 'Jacuzzi' : (parseInt(id) > 15 ? 'Suite' : 'Sencilla'),
-    vehiclePlate: isOccupied ? `ABC-${Math.floor(100 + Math.random() * 900)}` : undefined,
-    vehicleBrand: isOccupied ? (Math.random() > 0.5 ? 'Nissan' : 'Chevrolet') : undefined,
-    vehicleModel: isOccupied ? (Math.random() > 0.5 ? 'Versa' : 'Aveo') : undefined,
-    vehicleColor: isOccupied ? (Math.random() > 0.5 ? 'Rojo' : 'Blanco') : undefined,
-    entryType: isOccupied ? (Math.random() > 0.8 ? 'Pie' : Math.random() > 0.8 ? 'Moto' : 'Auto') : undefined,
-    clientName: isOccupied ? `Habitación ${id}` : undefined,
-    checkInTime: checkIn,
-    checkOutTime: checkOut,
-    tvControlCount: 0,
-    acControlCount: 0,
-    peopleCount: 2,
-    totalPrice: isOccupied ? (duration === 2 ? 220 : duration === 4 ? 280 : 500) : undefined
-  };
-});
-
-const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', name: 'Cerveza Corona', price: 45, category: 'Bebida', stock: 50 },
-  { id: '2', name: 'Refresco Cola', price: 30, category: 'Bebida', stock: 40 },
-  { id: '3', name: 'Agua Mineral', price: 25, category: 'Bebida', stock: 30 },
-  { id: '4', name: 'Papas Fritas', price: 35, category: 'Snack', stock: 20 },
-  { id: '5', name: 'Cacahuates', price: 20, category: 'Snack', stock: 25 },
-  { id: '6', name: 'Sandwich Jamón', price: 60, category: 'Cocina', stock: 10 },
-  { id: '7', name: 'Kit Pasión', price: 150, category: 'Otro', stock: 15 },
-  { id: '8', name: 'Preservativos', price: 50, category: 'Otro', stock: 100 },
-];
-
-const INITIAL_EMPLOYEES: Employee[] = [
-  { id: '1', name: 'Abigail', role: 'Recamarera', status: 'Activo', joinedDate: new Date('2024-01-15') },
-  { id: '2', name: 'Anahi', role: 'Recamarera', status: 'Activo', joinedDate: new Date('2024-03-20') },
-  { id: '3', name: 'Carlos', role: 'Mantenimiento', status: 'Descanso', joinedDate: new Date('2023-11-05') },
-  { id: '4', name: 'Sofia', role: 'Recepcionista', status: 'Activo', joinedDate: new Date('2024-05-01') },
-];
-
-const CHART_DATA = [
-  { name: 'Lun', ingresos: 4000, ocupacion: 45 },
-  { name: 'Mar', ingresos: 3000, ocupacion: 35 },
-  { name: 'Mie', ingresos: 5000, ocupacion: 55 },
-  { name: 'Jue', ingresos: 7500, ocupacion: 65 },
-  { name: 'Vie', ingresos: 12000, ocupacion: 90 },
-  { name: 'Sab', ingresos: 15000, ocupacion: 98 },
-  { name: 'Dom', ingresos: 11000, ocupacion: 85 },
-];
-
 export default function App() {
   // --- STATE ---
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
-  const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS);
   
-  // Food & Beverage State
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  // Data State (Empty initially, filled from DB)
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [consumptions, setConsumptions] = useState<Consumption[]>([]);
-  const [foodModalOpen, setFoodModalOpen] = useState(false);
-  const [productModalOpen, setProductModalOpen] = useState(false);
-
-  // Vehicle State
   const [vehicleReports, setVehicleReports] = useState<VehicleReport[]>([]);
-  
-  // Employees State
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-
-  // Expenses State
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [expensesList, setExpensesList] = useState<Expense[]>([]);
 
-  // Shift Management State
+  // UI State
+  const [foodModalOpen, setFoodModalOpen] = useState(false);
+  const [productModalOpen, setProductModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Occupancy Modal State
   const [occupancyModalOpen, setOccupancyModalOpen] = useState(false);
   const [selectedRoomForOccupancy, setSelectedRoomForOccupancy] = useState<Room | null>(null);
-
-  // Controls Modal State
   const [controlsModalOpen, setControlsModalOpen] = useState(false);
   const [selectedRoomForControls, setSelectedRoomForControls] = useState<Room | null>(null);
-
-  // AI Report State
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  // Toast State
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
-  // --- HANDLERS & EFFECTS ---
+  // --- INITIALIZATION ---
   
   useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchData();
+      else setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchData();
+      else setLoading(false);
+    });
+
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(timer);
+    };
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // 1. Rooms
+      const { data: roomsData, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*')
+        .order('id', { ascending: true }); // String sort might need custom logic for '9A'
+      
+      if (roomsData) {
+        // Custom sort for numeric + suffix IDs (1, 2, ... 9A, 9B, 10)
+        const sortedRooms = roomsData.sort((a: any, b: any) => {
+           const numA = parseInt(a.id.replace(/\D/g, ''));
+           const numB = parseInt(b.id.replace(/\D/g, ''));
+           if (numA !== numB) return numA - numB;
+           return a.id.localeCompare(b.id);
+        }).map((r: any) => ({
+          ...r,
+          checkInTime: r.check_in_time ? new Date(r.check_in_time) : undefined,
+          checkOutTime: r.check_out_time ? new Date(r.check_out_time) : undefined,
+          peopleCount: r.people_count,
+          clientName: r.client_name,
+          entryType: r.entry_type,
+          vehiclePlate: r.vehicle_plate,
+          vehicleBrand: r.vehicle_brand,
+          vehicleModel: r.vehicle_model,
+          vehicleColor: r.vehicle_color,
+          totalPrice: r.total_price,
+          tvControlCount: r.tv_control_count,
+          acControlCount: r.ac_control_count
+        }));
+        setRooms(sortedRooms);
+      }
+
+      // 2. Products
+      const { data: prodData } = await supabase.from('products').select('*');
+      if (prodData) setProducts(prodData);
+
+      // 3. Employees
+      const { data: empData } = await supabase.from('employees').select('*');
+      if (empData) {
+        setEmployees(empData.map((e: any) => ({
+          ...e,
+          joinedDate: new Date(e.joined_date)
+        })));
+      }
+
+      // 4. Expenses (Shift Logic would go here in real query, getting all for now)
+      const { data: expData } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+      if (expData) {
+        setExpensesList(expData.map((e: any) => ({ ...e, date: new Date(e.date) })));
+      }
+
+      // 5. Vehicle Reports
+      const { data: repData } = await supabase.from('vehicle_reports').select('*').order('date', { ascending: false });
+      if (repData) {
+        setVehicleReports(repData.map((r: any) => ({ ...r, date: new Date(r.date) })));
+      }
+
+      // 6. Consumptions (Complex: Fetch Header + Items)
+      // For simplicity in this demo, we fetch all. In prod, limit by date.
+      const { data: consData } = await supabase
+        .from('consumptions')
+        .select(`
+          *,
+          consumption_items (*)
+        `)
+        .order('timestamp', { ascending: false });
+
+      if (consData) {
+        const mappedConsumptions: Consumption[] = consData.map((c: any) => ({
+          id: c.id,
+          roomId: c.room_id,
+          employeeId: c.employee_id,
+          totalAmount: c.total_amount,
+          timestamp: new Date(c.timestamp),
+          status: c.status,
+          items: c.consumption_items.map((i: any) => ({
+            productId: i.product_id,
+            productName: i.product_name,
+            quantity: i.quantity,
+            unitPrice: i.unit_price,
+            total: i.total
+          }))
+        }));
+        setConsumptions(mappedConsumptions);
+      }
+
+    } catch (e) {
+      console.error("Error fetching data:", e);
+      setToast({ message: "Error cargando datos del servidor", type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getShiftInfo = () => {
     const hour = currentTime.getHours();
@@ -183,17 +201,24 @@ export default function App() {
 
   const currentShift = getShiftInfo();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === 'motellasbolas@gmail.com' && password === 'j5s82QSM') {
-      setIsAuthenticated(true);
-      setError('');
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError('Credenciales incorrectas o error de conexión.');
+      setLoading(false);
     } else {
-      setError('Credenciales incorrectas. Intente nuevamente.');
+      setError('');
+      // Session updates automatically via onAuthStateChange
     }
   };
 
-  const handleStatusChange = (roomId: string, newStatus: RoomStatus) => {
+  const handleStatusChange = async (roomId: string, newStatus: RoomStatus) => {
     if (newStatus === RoomStatus.OCCUPIED) {
       const room = rooms.find(r => r.id === roomId);
       if (room) {
@@ -203,41 +228,72 @@ export default function App() {
       return;
     }
 
-    setRooms(prev => prev.map(r => {
-      if (r.id === roomId) {
-        if (newStatus === RoomStatus.AVAILABLE || newStatus === RoomStatus.CLEANING) {
-          return { 
-            ...r, 
-            status: newStatus,
-            clientName: undefined,
-            vehiclePlate: undefined,
-            vehicleBrand: undefined,
-            vehicleModel: undefined,
-            vehicleColor: undefined,
-            entryType: undefined,
-            checkInTime: undefined,
-            checkOutTime: undefined,
-            peopleCount: undefined,
-            totalPrice: undefined,
-            tvControlCount: 0,
-            acControlCount: 0
-          };
-        }
-        return { ...r, status: newStatus };
-      }
-      return r;
-    }));
+    // Optimistic Update
+    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r));
+
+    // DB Update: Reset fields if becoming available/cleaning
+    const isReset = newStatus === RoomStatus.AVAILABLE || newStatus === RoomStatus.CLEANING;
+    const updateData = isReset ? {
+      status: newStatus,
+      client_name: null,
+      vehicle_plate: null,
+      vehicle_brand: null,
+      vehicle_model: null,
+      vehicle_color: null,
+      entry_type: null,
+      check_in_time: null,
+      check_out_time: null,
+      people_count: 2,
+      total_price: null,
+      tv_control_count: 0,
+      ac_control_count: 0
+    } : { status: newStatus };
+
+    const { error } = await supabase.from('rooms').update(updateData).eq('id', roomId);
+
+    if (error) {
+      setToast({ message: "Error actualizando habitación", type: "error" });
+      fetchData(); // Revert on error
+    }
   };
 
-  const handleConfirmOccupancy = (data: Partial<Room>) => {
+  const handleConfirmOccupancy = async (data: Partial<Room>) => {
     if (selectedRoomForOccupancy) {
+      const updatePayload = {
+        status: RoomStatus.OCCUPIED,
+        client_name: data.clientName,
+        people_count: data.peopleCount,
+        entry_type: data.entryType,
+        vehicle_plate: data.vehiclePlate,
+        vehicle_brand: data.vehicleBrand,
+        vehicle_model: data.vehicleModel,
+        vehicle_color: data.vehicleColor,
+        check_in_time: data.checkInTime,
+        check_out_time: data.checkOutTime,
+        total_price: data.totalPrice
+      };
+
+      // Optimistic
       setRooms(prev => prev.map(r => 
         r.id === selectedRoomForOccupancy.id 
-          ? { ...r, status: RoomStatus.OCCUPIED, ...data } 
+          ? { ...r, ...data, status: RoomStatus.OCCUPIED } 
           : r
       ));
+      
       setOccupancyModalOpen(false);
       setSelectedRoomForOccupancy(null);
+
+      // DB Update
+      const { error } = await supabase
+        .from('rooms')
+        .update(updatePayload)
+        .eq('id', selectedRoomForOccupancy.id);
+
+      if (error) {
+        console.error(error);
+        setToast({ message: "Error al guardar ocupación", type: 'error' });
+        fetchData();
+      }
     }
   };
 
@@ -246,7 +302,7 @@ export default function App() {
     setControlsModalOpen(true);
   };
 
-  const handleSaveControls = (roomId: string, tvCount: number, acCount: number) => {
+  const handleSaveControls = async (roomId: string, tvCount: number, acCount: number) => {
     setRooms(prev => prev.map(r => 
       r.id === roomId 
         ? { ...r, tvControlCount: tvCount, acControlCount: acCount }
@@ -254,131 +310,175 @@ export default function App() {
     ));
     setControlsModalOpen(false);
     setSelectedRoomForControls(null);
+
+    await supabase.from('rooms').update({
+      tv_control_count: tvCount,
+      ac_control_count: acCount
+    }).eq('id', roomId);
   };
 
-  const handleAddConsumption = (roomId: string, items: ConsumptionItem[]) => {
+  const handleAddConsumption = async (roomId: string, items: ConsumptionItem[]) => {
     const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
     
-    // 1. Create Consumption Record
-    const newConsumption: Consumption = {
-      id: Date.now().toString(),
-      roomId,
-      items,
-      totalAmount,
-      timestamp: new Date(),
-      status: 'Pendiente en Habitación'
-    };
-    setConsumptions(prev => [newConsumption, ...prev]);
+    try {
+      // 1. Insert Consumption Header
+      const { data: cons, error: consError } = await supabase
+        .from('consumptions')
+        .insert({
+          room_id: roomId,
+          total_amount: totalAmount,
+          status: 'Pendiente en Habitación'
+        })
+        .select()
+        .single();
+      
+      if (consError) throw consError;
 
-    // 2. Update Room Total Price
-    setRooms(prev => prev.map(r => {
-      if (r.id === roomId) {
-        return {
-          ...r,
-          totalPrice: (r.totalPrice || 0) + totalAmount
-        };
-      }
-      return r;
-    }));
+      // 2. Insert Items
+      const itemsPayload = items.map(item => ({
+        consumption_id: cons.id,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total: item.total
+      }));
 
-    setFoodModalOpen(false);
-    setToast({
-      message: `Se agregaron ${items.length} productos a la Habitación ${roomId}.`,
-      type: 'success'
-    });
-  };
+      const { error: itemsError } = await supabase.from('consumption_items').insert(itemsPayload);
+      if (itemsError) throw itemsError;
 
-  const handleAddProduct = (newProduct: Omit<Product, 'id'>) => {
-    const product: Product = {
-      ...newProduct,
-      id: Date.now().toString()
-    };
-    setProducts(prev => [...prev, product]);
-    setToast({
-      message: 'Producto añadido al menú correctamente.',
-      type: 'success'
-    });
-  };
+      // 3. Update Room Total Price
+      const room = rooms.find(r => r.id === roomId);
+      const newTotal = (room?.totalPrice || 0) + totalAmount;
+      
+      await supabase.from('rooms').update({ total_price: newTotal }).eq('id', roomId);
 
-  const handleAddVehicleReport = (report: Omit<VehicleReport, 'id' | 'date'>) => {
-    const newReport: VehicleReport = {
-      ...report,
-      id: Date.now().toString(),
-      date: new Date()
-    };
-    setVehicleReports(prev => [newReport, ...prev]);
-    setToast({
-      message: 'Reporte de vehículo registrado exitosamente.',
-      type: 'success'
-    });
-  };
+      // Refresh data
+      fetchData();
+      setFoodModalOpen(false);
+      setToast({
+        message: `Se agregaron ${items.length} productos a la Habitación ${roomId}.`,
+        type: 'success'
+      });
 
-  // --- EMPLOYEE HANDLERS ---
-  const handleAddEmployee = (data: Omit<Employee, 'id' | 'joinedDate'>) => {
-    const newEmployee: Employee = {
-      ...data,
-      id: Date.now().toString(),
-      joinedDate: new Date()
-    };
-    setEmployees(prev => [...prev, newEmployee]);
-    setToast({ message: 'Empleado registrado exitosamente.', type: 'success' });
-  };
-
-  const handleEditEmployee = (id: string, data: Partial<Employee>) => {
-    setEmployees(prev => prev.map(emp => emp.id === id ? { ...emp, ...data } : emp));
-    setToast({ message: 'Información de empleado actualizada.', type: 'success' });
-  };
-
-  const handleDeleteEmployee = (id: string) => {
-    if (confirm('¿Estás seguro de eliminar este empleado?')) {
-      setEmployees(prev => prev.filter(emp => emp.id !== id));
-      setToast({ message: 'Empleado eliminado.', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      setToast({ message: "Error al registrar consumo", type: "error" });
     }
   };
 
-  const handleAddEmployeeConsumption = (employeeId: string, items: ConsumptionItem[]) => {
+  const handleAddProduct = async (newProduct: Omit<Product, 'id'>) => {
+    const { error } = await supabase.from('products').insert(newProduct);
+    if (error) {
+      setToast({ message: "Error creando producto", type: "error" });
+    } else {
+      fetchData();
+      setToast({ message: 'Producto añadido correctamente.', type: 'success' });
+    }
+  };
+
+  const handleAddVehicleReport = async (report: Omit<VehicleReport, 'id' | 'date'>) => {
+    const { error } = await supabase.from('vehicle_reports').insert(report);
+    if (error) {
+      setToast({ message: "Error al guardar reporte", type: "error" });
+    } else {
+      fetchData();
+      setToast({ message: 'Reporte registrado exitosamente.', type: 'success' });
+    }
+  };
+
+  // --- EMPLOYEE HANDLERS ---
+  const handleAddEmployee = async (data: Omit<Employee, 'id' | 'joinedDate'>) => {
+    const { error } = await supabase.from('employees').insert(data);
+    if (!error) {
+      fetchData();
+      setToast({ message: 'Empleado registrado.', type: 'success' });
+    }
+  };
+
+  const handleEditEmployee = async (id: string, data: Partial<Employee>) => {
+    const { error } = await supabase.from('employees').update(data).eq('id', id);
+    if (!error) {
+      fetchData();
+      setToast({ message: 'Empleado actualizado.', type: 'success' });
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (confirm('¿Estás seguro de eliminar este empleado?')) {
+      const { error } = await supabase.from('employees').delete().eq('id', id);
+      if (!error) {
+        fetchData();
+        setToast({ message: 'Empleado eliminado.', type: 'success' });
+      }
+    }
+  };
+
+  const handleAddEmployeeConsumption = async (employeeId: string, items: ConsumptionItem[]) => {
     const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
-    const newConsumption: Consumption = {
-      id: Date.now().toString(),
-      employeeId, // Track it via employee ID
-      items,
-      totalAmount,
-      timestamp: new Date(),
-      status: 'Descuento Nómina'
-    };
-    setConsumptions(prev => [newConsumption, ...prev]);
-    setToast({ message: 'Consumo de empleado registrado.', type: 'success' });
+    
+    try {
+      const { data: cons, error: consError } = await supabase
+        .from('consumptions')
+        .insert({
+          employee_id: employeeId,
+          total_amount: totalAmount,
+          status: 'Descuento Nómina'
+        })
+        .select()
+        .single();
+        
+      if (consError) throw consError;
+
+      const itemsPayload = items.map(item => ({
+        consumption_id: cons.id,
+        product_id: item.productId,
+        product_name: item.productName,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total: item.total
+      }));
+
+      await supabase.from('consumption_items').insert(itemsPayload);
+      
+      fetchData();
+      setToast({ message: 'Consumo de empleado registrado.', type: 'success' });
+
+    } catch (e) {
+      setToast({ message: "Error registrando consumo", type: "error" });
+    }
   };
 
   // --- EXPENSE HANDLERS ---
-  const handleAddExpense = (description: string, amount: number) => {
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      description,
-      amount,
-      date: new Date()
-    };
-    setExpensesList(prev => [newExpense, ...prev]);
-    setToast({ message: 'Gasto registrado correctamente.', type: 'success' });
+  const handleAddExpense = async (description: string, amount: number) => {
+    const { error } = await supabase.from('expenses').insert({ description, amount });
+    if (!error) {
+      fetchData();
+      setToast({ message: 'Gasto registrado.', type: 'success' });
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    setExpensesList(prev => prev.filter(ex => ex.id !== id));
-    setToast({ message: 'Gasto eliminado.', type: 'success' });
+  const handleDeleteExpense = async (id: string) => {
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (!error) {
+      fetchData();
+      setToast({ message: 'Gasto eliminado.', type: 'success' });
+    }
   };
 
   const handleGenerateReport = async () => {
     setIsAnalyzing(true);
+    // Simple mock stats for context, in real app calculate from history
     const context = `
-      Ingresos Semanales: ${JSON.stringify(CHART_DATA)}
-      Estado Actual Habitaciones: ${rooms.filter(r => r.status === RoomStatus.OCCUPIED).length} ocupadas de 21.
+      Estado Actual Habitaciones: ${rooms.filter(r => r.status === RoomStatus.OCCUPIED).length} ocupadas de ${rooms.length}.
+      Ingresos Turno Actual: $${(consumptions.reduce((acc, c) => acc + c.totalAmount, 0)).toFixed(2)}
     `;
     const result = await analyzeBusinessData(context);
     setAiAnalysis(result);
     setIsAnalyzing(false);
   };
 
-  // --- DASHBOARD CALCULATIONS ---
+  // --- DASHBOARD CALCULATIONS (Live from DB State) ---
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
@@ -386,16 +486,15 @@ export default function App() {
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length;
   const activePeopleCount = rooms.reduce((acc, r) => acc + (r.peopleCount || 0), 0);
   
-  // Financials
-  // 1. Room Revenue (Hardcoded/Mock for now)
-  const roomRevenue = 3250.00;
+  // 1. Room Revenue (From currently occupied rooms only for "Shift" view - Simplified)
+  const roomRevenue = rooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
   
-  // 2. Product Revenue (Consumptions attached to rooms)
+  // 2. Product Revenue
   const productRevenue = consumptions
-    .filter(c => !c.employeeId) // Only room consumptions
+    .filter(c => !c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  // 3. Employee Consumption (Consumptions attached to employees)
+  // 3. Employee Consumption
   const employeeConsumption = consumptions
     .filter(c => c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
@@ -403,23 +502,29 @@ export default function App() {
   // 4. Expenses
   const totalExpenses = expensesList.reduce((acc, curr) => acc + curr.amount, 0);
   
+  // Note: This logic assumes all currently loaded consumptions/expenses belong to the current shift
+  // In a full production app, you would filter `consumptions` and `expensesList` by `timestamp` > `shiftStartTime`.
   const totalShiftRevenue = roomRevenue + productRevenue;
-  const totalGeneral = totalShiftRevenue - totalExpenses; // Revenue - Expenses
+  const totalGeneral = totalShiftRevenue - totalExpenses;
 
-  // --- FOOD STATS ---
-  const foodConsumptions = consumptions.filter(c => !c.employeeId); // Only client food
+  // Food Stats
+  const foodConsumptions = consumptions.filter(c => !c.employeeId);
   const foodTotalRevenue = foodConsumptions.reduce((acc, curr) => acc + curr.totalAmount, 0);
   const foodTotalOrders = foodConsumptions.length;
   const foodAvgTicket = foodTotalOrders > 0 ? foodTotalRevenue / foodTotalOrders : 0;
 
-  // --- LOGIN SCREEN ---
-  if (!isAuthenticated) {
+  // --- LOADING / LOGIN SCREEN ---
+  if (loading) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+          <Sparkles className="w-10 h-10 animate-spin text-rose-500" />
+       </div>
+     )
+  }
+
+  if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-rose-50 p-4 relative overflow-hidden">
-        {/* Decorative Background Elements */}
-        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-rose-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-fuchsia-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-
         <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/50 relative z-10">
           <div className="text-center mb-8">
             <div className="bg-rose-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
@@ -436,7 +541,7 @@ export default function App() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition bg-white/50"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none transition bg-white/50"
                 placeholder="admin@motel.com"
                 required
               />
@@ -447,7 +552,7 @@ export default function App() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition bg-white/50"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none transition bg-white/50"
                 placeholder="••••••••"
                 required
               />
@@ -461,9 +566,10 @@ export default function App() {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white font-semibold py-3.5 rounded-xl shadow-lg hover:shadow-rose-500/30 hover:scale-[1.02] transition-all duration-200"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white font-semibold py-3.5 rounded-xl shadow-lg hover:shadow-rose-500/30 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50"
             >
-              Ingresar al Sistema
+              {loading ? 'Conectando...' : 'Ingresar al Sistema'}
             </button>
           </form>
           
@@ -522,11 +628,11 @@ export default function App() {
              </div>
              <div>
                <p className="text-sm font-bold text-slate-700">Admin</p>
-               <p className="text-xs text-slate-400">Gerente General</p>
+               <p className="text-xs text-slate-400">{session.user.email}</p>
              </div>
           </div>
           <button 
-            onClick={() => setIsAuthenticated(false)}
+            onClick={() => supabase.auth.signOut()}
             className="w-full flex items-center gap-2 text-rose-500 hover:bg-rose-50 px-4 py-3 rounded-xl transition text-sm font-medium"
           >
             <LogOut className="w-4 h-4" /> Cerrar Sesión
@@ -541,8 +647,6 @@ export default function App() {
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl font-bold text-slate-800">{currentView}</h2>
-            
-            {/* Shift Badge */}
             <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${currentShift.bg} ${currentShift.color} border-current/20`}>
               <currentShift.icon className="w-3.5 h-3.5" />
               <span>Turno {currentShift.name}</span>
@@ -558,11 +662,6 @@ export default function App() {
                 {currentTime.toLocaleDateString([], {weekday: 'long', day:'numeric', month:'long'})}
               </p>
             </div>
-            
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 transition">
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-            </button>
           </div>
         </header>
 
@@ -583,7 +682,7 @@ export default function App() {
                         <BedDouble className="w-6 h-6 text-white" />
                       </div>
                       <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-lg border border-green-500/30">
-                        {Math.round((activeRoomCount / rooms.length) * 100)}% Ocupación
+                        {rooms.length > 0 ? Math.round((activeRoomCount / rooms.length) * 100) : 0}% Ocupación
                       </span>
                     </div>
                     <p className="text-slate-400 text-sm font-medium">Habitaciones Ocupadas</p>
@@ -615,14 +714,14 @@ export default function App() {
                    <p className="text-xs text-purple-500 font-medium mt-1">Huéspedes actuales</p>
                 </div>
 
-                {/* Previous Shift (Mock) */}
+                {/* Other Shift Revenue */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 opacity-60 hover:opacity-100 transition">
                    <div className="flex justify-between items-start mb-4">
                       <div className="p-3 bg-slate-50 rounded-xl text-slate-500">
                         <DollarSign className="w-6 h-6" />
                       </div>
                    </div>
-                   <p className="text-slate-500 text-sm font-medium">Ingresos Turno Anterior</p>
+                   <p className="text-slate-500 text-sm font-medium">Ingresos Turno Matutino</p>
                    <p className="text-3xl font-bold text-slate-800 mt-1">$0.00</p>
                    <p className="text-xs text-slate-400 font-medium mt-1">Turno finalizado</p>
                 </div>
@@ -738,8 +837,6 @@ export default function App() {
           {/* Food View */}
           {currentView === AppView.FOOD && (
             <div className="space-y-8 animate-fade-in">
-              
-              {/* Header Actions */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0f172a] p-6 rounded-2xl shadow-lg border border-slate-700">
                 <div>
                    <h2 className="text-2xl font-bold text-rose-500">Gestión de Alimentos y Bebidas</h2>
@@ -752,12 +849,6 @@ export default function App() {
                   >
                     <Package className="w-4 h-4" /> Añadir/Editar Menú
                   </button>
-                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 text-sm font-medium">
-                    <BoxIcon className="w-4 h-4" /> Gestionar Tipos
-                  </button>
-                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 border border-slate-600 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 text-sm font-medium">
-                     <Users className="w-4 h-4" /> Gestionar Categorías
-                  </button>
                   <button 
                     onClick={() => setFoodModalOpen(true)}
                     className="px-6 py-2.5 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 shadow-lg shadow-rose-900/30 transition flex items-center gap-2 text-sm"
@@ -767,7 +858,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
                    <div className="bg-blue-100 p-3 rounded-xl text-blue-600">
@@ -808,7 +898,6 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                 {/* Menu List */}
                  <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                        <h3 className="font-bold text-slate-800">Menú Actual</h3>
@@ -841,7 +930,6 @@ export default function App() {
                     </div>
                  </div>
 
-                 {/* Recent Activity */}
                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                     <h3 className="font-bold text-slate-800 mb-4">Últimos Consumos</h3>
                     <div className="space-y-4">
@@ -966,8 +1054,3 @@ export default function App() {
     </div>
   );
 }
-
-// Helper Icon for Box
-const BoxIcon = (props: any) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-);
