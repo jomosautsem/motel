@@ -486,25 +486,39 @@ export default function App() {
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length;
   const activePeopleCount = rooms.reduce((acc, r) => acc + (r.peopleCount || 0), 0);
   
-  // 1. Room Revenue (From currently occupied rooms only for "Shift" view - Simplified)
-  const roomRevenue = rooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
+  // 1. Calculate TOTAL Room Ticket Value (Rent + Pending Consumptions) from Occupied Rooms
+  const grossRoomTotal = rooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
+
+  // 2. Identify Active Consumptions (Food/Drinks still "On Tab" in rooms)
+  // We sum consumptions that are 'Pendiente en Habitación'
+  const activeConsumptionsTotal = consumptions
+    .filter(c => c.status === 'Pendiente en Habitación' && c.roomId)
+    .reduce((acc, c) => acc + c.totalAmount, 0);
+
+  // 3. NET Room Revenue (Pure Rent) = Gross Total - Active Consumptions
+  // This fixes the double counting issue.
+  const roomRevenue = grossRoomTotal - activeConsumptionsTotal;
   
-  // 2. Product Revenue
+  // 4. Product Revenue (Total of ALL non-employee consumptions)
+  // This includes what is currently pending in rooms + what might have been paid separately
   const productRevenue = consumptions
     .filter(c => !c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  // 3. Employee Consumption
+  // 5. Employee Consumption
   const employeeConsumption = consumptions
     .filter(c => c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  // 4. Expenses
+  // 6. Expenses
   const totalExpenses = expensesList.reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Note: This logic assumes all currently loaded consumptions/expenses belong to the current shift
-  // In a full production app, you would filter `consumptions` and `expensesList` by `timestamp` > `shiftStartTime`.
+  // 7. Total Shift Revenue
+  // Logic: Pure Rent + All Product Sales
+  // Example: Rent $330 + Soda $20. 
+  // roomRevenue = $330. productRevenue = $20. Total = $350. Correct.
   const totalShiftRevenue = roomRevenue + productRevenue;
+  
   const totalGeneral = totalShiftRevenue - totalExpenses;
 
   // Food Stats
@@ -733,6 +747,7 @@ export default function App() {
                     <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
                        <BedDouble className="w-4 h-4" /> Ingresos por Habitaciones
                     </div>
+                    {/* Display NET Room Revenue (Pure Rent) */}
                     <p className="text-2xl font-bold text-green-800 text-right">{formatCurrency(roomRevenue)}</p>
                  </div>
                  
@@ -796,6 +811,7 @@ export default function App() {
                 <RoomCard 
                   key={room.id} 
                   room={room} 
+                  activeConsumptions={consumptions.filter(c => c.roomId === room.id && c.status === 'Pendiente en Habitación')}
                   onStatusChange={handleStatusChange}
                   onOpenControls={handleOpenControls}
                 />
