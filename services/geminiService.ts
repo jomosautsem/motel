@@ -1,9 +1,19 @@
+
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safety check to prevent "process is not defined" crash in browser
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) 
+  ? process.env.API_KEY 
+  : ''; 
+
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 export const analyzeBusinessData = async (dataContext: string): Promise<string> => {
   try {
+    if (!apiKey) {
+      return "API Key no configurada. No se puede realizar el análisis.";
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `
