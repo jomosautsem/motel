@@ -523,10 +523,10 @@ export default function App() {
   const totalExpenses = expensesList.reduce((acc, curr) => acc + curr.amount, 0);
   
   // 7. Total Shift Revenue
-  // Logic: Pure Rent + All Product Sales
-  // Example: Rent $330 + Soda $20. 
-  // roomRevenue = $330. productRevenue = $20. Total = $350. Correct.
-  const totalShiftRevenue = roomRevenue + productRevenue;
+  // Logic: Pure Rent + All Product Sales + Employee Consumption (as requested)
+  // Example: Rent $330 + Soda $20 + Emp $50. 
+  // roomRevenue = $330. productRevenue = $20. emp = $50. Total = $400.
+  const totalShiftRevenue = roomRevenue + productRevenue + employeeConsumption;
   
   const totalGeneral = totalShiftRevenue - totalExpenses;
 
