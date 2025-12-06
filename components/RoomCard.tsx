@@ -26,7 +26,8 @@ import {
   BedDouble,
   ShoppingCart,
   Tv,
-  Thermometer
+  Thermometer,
+  Hourglass
 } from 'lucide-react';
 
 interface RoomCardProps {
@@ -38,6 +39,7 @@ interface RoomCardProps {
   onAddPerson?: (room: Room) => void;
   onRequestRelease?: (room: Room) => void;
   variant?: 'standard' | 'compact';
+  currentTime?: Date; // Added for real-time overdue calculation
 }
 
 export const RoomCard: React.FC<RoomCardProps> = ({ 
@@ -48,7 +50,8 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   onChangeRoom,
   onAddPerson,
   onRequestRelease,
-  variant = 'standard' 
+  variant = 'standard',
+  currentTime = new Date()
 }) => {
   const [showActions, setShowActions] = useState(false);
 
@@ -60,7 +63,22 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     return (end - start) / (1000 * 60 * 60);
   };
 
+  // Overdue Logic
+  const isOccupied = room.status === RoomStatus.OCCUPIED;
+  const checkOutTime = room.checkOutTime ? new Date(room.checkOutTime) : null;
+  const isOverdue = isOccupied && checkOutTime && currentTime > checkOutTime;
+  
+  const getOverdueTime = () => {
+    if (!isOverdue || !checkOutTime) return 0;
+    const diffMs = currentTime.getTime() - checkOutTime.getTime();
+    return Math.floor(diffMs / 60000); // Minutes
+  };
+
+  const overdueMinutes = getOverdueTime();
+
   const getOccupancyColorClass = () => {
+    // If overdue, force Red/Danger styling? Or keep urgency on badge?
+    // Let's keep the paid duration color but add visual alarm.
     const hours = getDurationHours();
     if (hours <= 2.1) return 'bg-green-500 text-white border-green-600';
     if (hours <= 4.1) return 'bg-orange-500 text-white border-orange-600';
@@ -112,20 +130,15 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   const totalConsumptionAmount = activeConsumptions.reduce((acc, c) => acc + c.totalAmount, 0);
   const totalRoomPrice = room.totalPrice || 0;
   
-  // Logic: Base occupancy is 2. Anything above is extra.
-  // Extra person cost is $150 per person.
   const peopleCount = room.peopleCount || 2;
   const extraPeople = Math.max(0, peopleCount - 2);
   const extraPersonCost = extraPeople * 150;
   
-  // Rent Price = Total - Consumptions - ExtraPersonCost
   const roomRentPrice = totalRoomPrice - totalConsumptionAmount - extraPersonCost;
-
   const allItems = activeConsumptions.flatMap(c => c.items);
 
   // --- COMPACT VIEW (DASHBOARD) ---
   if (variant === 'compact') {
-    const isOccupied = room.status === RoomStatus.OCCUPIED;
     const hasTvControls = (room.tvControlCount || 0) > 0;
     const hasAcControls = (room.acControlCount || 0) > 0;
 
@@ -137,6 +150,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         }}
         className={`relative p-3 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between h-[140px] cursor-pointer ${getStatusColor(room.status)}`}
       >
+        {/* Overdue Alarm Compact */}
+        {isOverdue && (
+           <div className="absolute -top-2 -right-2 z-20 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse border-2 border-white shadow-sm flex items-center gap-1">
+             <Hourglass className="w-3 h-3" />
+             +{overdueMinutes}m
+           </div>
+        )}
+
         <div className="flex justify-between items-start">
           <span className="text-lg font-bold leading-none">Hab {room.id}</span>
           {isOccupied && (
@@ -150,7 +171,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         <div className="flex-1 flex flex-col justify-center items-center text-center relative">
           {isOccupied ? (
             <>
-              <p className="text-2xl font-bold">{formatTime(room.checkOutTime)}</p>
+              <p className={`text-2xl font-bold ${isOverdue ? 'animate-pulse' : ''}`}>{formatTime(room.checkOutTime)}</p>
               <p className="text-[10px] opacity-90 uppercase tracking-wide mt-1">Salida</p>
             </>
           ) : (
@@ -196,6 +217,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   return (
     <div className={`relative p-5 rounded-2xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between min-h-[380px] ${getStatusColor(room.status)}`}>
       
+      {/* Overdue Alarm Standard */}
+      {isOverdue && (
+         <div className="absolute -top-3 -right-3 z-20 bg-red-600 text-white px-3 py-1.5 rounded-full font-bold shadow-lg animate-pulse border-2 border-white flex items-center gap-1.5">
+           <AlertTriangle className="w-4 h-4" />
+           VENCIDA +{overdueMinutes}m
+         </div>
+      )}
+
       {/* Header */}
       <div>
         <div className="flex justify-between items-start mb-4">
@@ -235,7 +264,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                          <span className="font-mono font-bold">${roomRentPrice.toFixed(2)}</span>
                       </div>
 
-                      {/* Extra Person Line (If applicable) */}
+                      {/* Extra Person Line */}
                       {extraPeople > 0 && (
                         <div className="flex justify-between items-center text-xs text-slate-700">
                            <div className="flex items-center gap-2">
@@ -324,7 +353,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                   </div>
 
                   {/* Time Range */}
-                  <div className="flex items-center gap-2 text-xs bg-black/10 p-2 rounded-lg">
+                  <div className={`flex items-center gap-2 text-xs bg-black/10 p-2 rounded-lg ${isOverdue ? 'ring-2 ring-red-500 animate-pulse' : ''}`}>
                     <Clock className="w-3.5 h-3.5 opacity-70" />
                     <div className="flex gap-2 font-mono font-medium">
                       <span>{formatTime(room.checkInTime)}</span>

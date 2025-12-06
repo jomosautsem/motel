@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { RoomHistoryEntry, Consumption, Expense, VehicleLog } from '../types';
-import { Calendar, FileText, Download, Filter, Search } from 'lucide-react';
+import { Calendar, FileText, Download, Filter, Search, AlertCircle } from 'lucide-react';
 
 interface ShiftHistoryManagerProps {
   roomHistory: RoomHistoryEntry[];
@@ -46,6 +46,18 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
+  };
+
+  // Logic to infer Paid Hours from Price
+  const getPaidHours = (price: number) => {
+    // 2hr $220, 4hr $280, 5hr $300, 8hr $330, 12hr $480
+    // We assume standard rates. Extra people or penalties might skew this slightly, 
+    // but it serves as a good baseline for auditing.
+    if (price <= 240) return 2;
+    if (price <= 290) return 4;
+    if (price <= 315) return 5;
+    if (price <= 350) return 8;
+    return 12; // Assuming 12h for anything higher unless it's huge
   };
 
   // Filter Data
@@ -128,21 +140,31 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
     // -- Room History Table --
-    doc.text("Detalle de Habitaciones (Liberadas)", 14, yPos);
+    doc.text("Detalle de Habitaciones (Auditoría de Tiempo)", 14, yPos);
     yPos += 5;
 
-    const roomRows = filteredRooms.map(r => [
-      `Hab ${r.roomId}`,
-      r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
-      r.checkOutTime ? r.checkOutTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
-      getDurationString(r.checkInTime, r.checkOutTime),
-      `$${r.totalPrice.toFixed(2)}`
-    ]);
+    const roomRows = filteredRooms.map(r => {
+        const paidHours = getPaidHours(r.totalPrice);
+        const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
+        const actualHours = actualMs / (1000 * 60 * 60);
+        
+        const excessMinutes = Math.floor((actualHours - paidHours) * 60);
+        const excessStr = excessMinutes > 15 ? `+${Math.floor(excessMinutes/60)}h ${excessMinutes%60}m` : '-';
+
+        return [
+          `Hab ${r.roomId}`,
+          r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
+          r.checkOutTime ? r.checkOutTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
+          getDurationString(r.checkInTime, r.checkOutTime),
+          `$${r.totalPrice.toFixed(2)}`,
+          excessStr // New Column
+        ];
+    });
 
     (doc as any).autoTable({
       startY: yPos,
-      head: [['Habitación', 'Entrada', 'Salida', 'Tiempo', 'Total']],
-      body: roomRows.length > 0 ? roomRows : [['-', '-', '-', '-', '-']],
+      head: [['Habitación', 'Entrada', 'Salida', 'Tiempo Real', 'Pagado', 'Exceso']],
+      body: roomRows.length > 0 ? roomRows : [['-', '-', '-', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [71, 85, 105] }, // Slate 600
     });
@@ -164,7 +186,7 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
       head: [['Descripción', 'Hora', 'Monto']],
       body: expenseRows.length > 0 ? expenseRows : [['Sin gastos', '-', '$0.00']],
       theme: 'striped',
-      headStyles: { fillColor: [225, 29, 72] }, // Rose 600 (Warning color)
+      headStyles: { fillColor: [225, 29, 72] }, // Rose 600
     });
     
     // Add page if needed
@@ -297,15 +319,30 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
                  <p className="text-center text-slate-400 py-10 italic">No hay movimientos registrados para este turno.</p>
               ) : (
                 <>
-                  {filteredRooms.map(r => (
-                     <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
-                        <div>
-                          <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
-                          <span className="text-xs text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
+                  {filteredRooms.map(r => {
+                     const paidHours = getPaidHours(r.totalPrice);
+                     const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
+                     const actualHours = actualMs / (1000 * 60 * 60);
+                     const excessMinutes = Math.floor((actualHours - paidHours) * 60);
+                     const hasExcess = excessMinutes > 15;
+
+                     return (
+                        <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
+                            <div>
+                              <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
+                              <div className="flex gap-2 text-xs">
+                                <span className="text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
+                                {hasExcess && (
+                                    <span className="text-rose-500 font-bold flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" /> Exceso +{Math.floor(excessMinutes)}m
+                                    </span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="font-bold text-slate-800">+ ${r.totalPrice}</span>
                         </div>
-                        <span className="font-bold text-slate-800">+ ${r.totalPrice}</span>
-                     </div>
-                  ))}
+                     );
+                  })}
                   {filteredExpenses.map(e => (
                      <div key={e.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
                         <span className="text-rose-600">{e.description}</span>

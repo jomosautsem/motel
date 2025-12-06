@@ -1035,6 +1035,7 @@ export default function App() {
                       room={room} 
                       onStatusChange={handleStatusChange} 
                       variant="compact"
+                      currentTime={currentTime}
                     />
                   ))}
                 </div>
@@ -1054,6 +1055,7 @@ export default function App() {
                   onChangeRoom={handleChangeRoom}
                   onAddPerson={() => handleAddPersonClick(room)}
                   onRequestRelease={handleRequestRelease}
+                  currentTime={currentTime}
                 />
               ))}
             </div>
