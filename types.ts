@@ -93,6 +93,8 @@ export interface Consumption {
 export interface VehicleReport {
   id: string;
   plate: string;
+  brand?: string;
+  model?: string;
   description: string;
   date: Date;
   severity: 'Baja' | 'Media' | 'Alta';

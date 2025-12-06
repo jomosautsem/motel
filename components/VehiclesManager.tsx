@@ -21,6 +21,16 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
   const motoCount = occupiedRooms.filter(r => r.entryType === 'Moto').length;
   const footCount = occupiedRooms.filter(r => r.entryType === 'Pie').length;
 
+  // Derive active vehicles list for the modal
+  const activeVehicles = occupiedRooms
+    .filter(r => r.vehiclePlate) // Only vehicles with plates
+    .map(r => ({
+      plate: r.vehiclePlate!,
+      brand: r.vehicleBrand || '',
+      model: r.vehicleModel || '',
+      room: r.id
+    }));
+
   return (
     <div className="animate-fade-in space-y-8 min-h-full">
       
@@ -120,6 +130,12 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
                     {report.severity}
                   </span>
                 </div>
+                {/* Brand/Model Display */}
+                {(report.brand || report.model) && (
+                  <p className="text-xs font-bold text-slate-600 mb-1">
+                    {report.brand} {report.model}
+                  </p>
+                )}
                 <p className="text-slate-700 text-sm mb-3">{report.description}</p>
                 <p className="text-xs text-slate-400 text-right">{report.date.toLocaleDateString()}</p>
               </div>
@@ -249,25 +265,15 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
 
                       return (
                         <tr key={log.id} className="hover:bg-slate-50 transition">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-3 h-3 text-slate-400" />
-                              <span className="font-medium text-slate-700">{log.entryTime.toLocaleDateString()}</span>
-                              <span className="text-xs text-slate-400">{log.entryTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 font-bold text-slate-800">Hab {log.roomId}</td>
-                          <td className="px-4 py-3">
-                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.entryType === 'Auto' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                               {log.entryType}
-                             </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono font-bold">{log.plate || '-'}</td>
-                          <td className="px-4 py-3 text-slate-500">{log.brand} {log.model} {log.color && `(${log.color})`}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{log.entryTime.toLocaleString()}</td>
+                          <td className="px-4 py-3 font-bold">Hab {log.roomId}</td>
+                          <td className="px-4 py-3">{log.entryType}</td>
+                          <td className="px-4 py-3 font-mono font-bold text-slate-800">{log.plate || '-'}</td>
+                          <td className="px-4 py-3">{log.brand} {log.model} {log.color}</td>
                           <td className="px-4 py-3 text-right">
-                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${!log.exitTime ? 'bg-green-100 text-green-700' : 'text-slate-500'}`}>
-                               {duration}
-                             </span>
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${log.exitTime ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-600'}`}>
+                              {duration}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -279,11 +285,14 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
         </div>
       )}
 
+      {/* Report Modal */}
       <VehicleReportModal 
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSave={onAddReport}
+        knownVehicles={activeVehicles}
       />
+
     </div>
   );
 };

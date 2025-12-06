@@ -113,6 +113,7 @@ const App: React.FC = () => {
   const initSystem = async () => {
     try {
       // 1. AUTO-LOGIN (Fixes "No rooms visible" issue due to RLS)
+      // This is crucial. If this fails or is missing, Supabase returns empty arrays.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         const { error: authError } = await supabase.auth.signInWithPassword({
@@ -726,6 +727,8 @@ const App: React.FC = () => {
   const handleAddVehicleReport = async (reportData: any) => {
     const { error } = await supabase.from('vehicle_reports').insert({
         plate: reportData.plate,
+        brand: reportData.brand,
+        model: reportData.model,
         description: reportData.description,
         severity: reportData.severity,
         date: new Date()
@@ -970,7 +973,7 @@ const App: React.FC = () => {
                 ))}
                 {rooms.length === 0 && (
                   <div className="col-span-full py-8 text-center text-slate-400">
-                    Cargando habitaciones o base de datos vacía...
+                    Cargando habitaciones...
                   </div>
                 )}
               </div>

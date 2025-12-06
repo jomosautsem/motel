@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
-import { X, AlertTriangle, Save } from 'lucide-react';
+import { X, AlertTriangle, Save, Car } from 'lucide-react';
 import { VehicleReport } from '../types';
 
 interface VehicleReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (report: Omit<VehicleReport, 'id' | 'date'>) => void;
+  knownVehicles?: { plate: string, brand: string, model: string, room: string }[];
 }
 
-export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, onClose, onSave }) => {
+export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, onClose, onSave, knownVehicles = [] }) => {
   const [plate, setPlate] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<VehicleReport['severity']>('Baja');
 
@@ -18,11 +21,26 @@ export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ plate, description, severity });
+    onSave({ plate, brand, model, description, severity });
+    // Reset
     setPlate('');
+    setBrand('');
+    setModel('');
     setDescription('');
     setSeverity('Baja');
     onClose();
+  };
+
+  const handleSelectVehicle = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedPlate = e.target.value;
+    if (!selectedPlate) return;
+
+    const vehicle = knownVehicles.find(v => v.plate === selectedPlate);
+    if (vehicle) {
+      setPlate(vehicle.plate);
+      setBrand(vehicle.brand);
+      setModel(vehicle.model);
+    }
   };
 
   return (
@@ -41,7 +59,28 @@ export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, 
         </div>
 
         {/* Content */}
-        <div className="p-6 md:p-8">
+        <div className="p-6 md:p-8 bg-white">
+          
+          {/* Quick Select from Active Vehicles */}
+          {knownVehicles.length > 0 && (
+            <div className="mb-6 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                <Car className="w-3 h-3" /> Seleccionar de Activos
+              </label>
+              <select 
+                onChange={handleSelectVehicle}
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">-- Lista de vehículos en propiedad --</option>
+                {knownVehicles.map((v, idx) => (
+                  <option key={`${v.plate}-${idx}`} value={v.plate}>
+                    Hab {v.room}: {v.plate} ({v.brand})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <form id="reportForm" onSubmit={handleSubmit} className="space-y-5">
             
             <div className="space-y-2">
@@ -51,9 +90,32 @@ export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, 
                 value={plate}
                 onChange={(e) => setPlate(e.target.value.toUpperCase())}
                 placeholder="ABC-1234"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none uppercase font-mono"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none uppercase font-mono font-bold"
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Marca</label>
+                <input 
+                  type="text" 
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  placeholder="Ej. Nissan"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Modelo</label>
+                <input 
+                  type="text" 
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Ej. Versa"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -61,7 +123,7 @@ export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, 
               <select 
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value as any)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none bg-white"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none"
               >
                 <option value="Baja">Baja (Observación)</option>
                 <option value="Media">Media (Incidente menor)</option>
@@ -76,7 +138,7 @@ export const VehicleReportModal: React.FC<VehicleReportModalProps> = ({ isOpen, 
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describa el motivo del reporte..."
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
                 required
               />
             </div>
