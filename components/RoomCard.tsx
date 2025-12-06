@@ -60,12 +60,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
 
   const getOccupancyColorClass = () => {
     const hours = getDurationHours();
-    // Allow small margin of error for floating point calc
     if (hours <= 2.1) return 'bg-green-500 text-white border-green-600';
     if (hours <= 4.1) return 'bg-orange-500 text-white border-orange-600';
     if (hours <= 5.1) return 'bg-yellow-400 text-slate-900 border-yellow-500';
     if (hours <= 8.1) return 'bg-red-600 text-white border-red-700';
-    return 'bg-blue-600 text-white border-blue-700'; // 12h or more
+    return 'bg-blue-600 text-white border-blue-700';
   };
 
   const getStatusColor = (status: RoomStatus) => {
@@ -107,13 +106,19 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     }
   };
 
-  // Calculations for Breakdown
+  // --- Breakdown Calculations ---
   const totalConsumptionAmount = activeConsumptions.reduce((acc, c) => acc + c.totalAmount, 0);
   const totalRoomPrice = room.totalPrice || 0;
-  // Assuming totalRoomPrice includes consumptions, we deduct them to find the rent
-  const roomRentPrice = totalRoomPrice - totalConsumptionAmount; 
+  
+  // Logic: Base occupancy is 2. Anything above is extra.
+  // Extra person cost is $150 per person.
+  const peopleCount = room.peopleCount || 2;
+  const extraPeople = Math.max(0, peopleCount - 2);
+  const extraPersonCost = extraPeople * 150;
+  
+  // Rent Price = Total - Consumptions - ExtraPersonCost
+  const roomRentPrice = totalRoomPrice - totalConsumptionAmount - extraPersonCost;
 
-  // Flatten all items for display
   const allItems = activeConsumptions.flatMap(c => c.items);
 
   // --- COMPACT VIEW (DASHBOARD) ---
@@ -126,7 +131,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
       <div 
         onClick={() => {
            if (room.status === RoomStatus.AVAILABLE) onStatusChange(room.id, RoomStatus.OCCUPIED);
-           else if (isOccupied) setShowActions(!showActions); // Toggle simple view or external handler
+           else if (isOccupied) setShowActions(!showActions);
         }}
         className={`relative p-3 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between h-[140px] cursor-pointer ${getStatusColor(room.status)}`}
       >
@@ -176,8 +181,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   }
 
   // --- STANDARD VIEW (ROOMS SCREEN) ---
-  
-  // Occupied Menu Action Button Component
   const ActionBtn = ({ icon: Icon, label, colorClass, onClick }: { icon: any, label: string, colorClass: string, onClick?: () => void }) => (
     <button 
       onClick={onClick}
@@ -206,7 +209,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         {/* Content Area */}
         <div className="space-y-3">
           
-          {/* --- OCCUPIED VIEW --- */}
           {room.status === RoomStatus.OCCUPIED && (
             <>
               {showActions ? (
@@ -230,6 +232,17 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                          </div>
                          <span className="font-mono font-bold">${roomRentPrice.toFixed(2)}</span>
                       </div>
+
+                      {/* Extra Person Line (If applicable) */}
+                      {extraPeople > 0 && (
+                        <div className="flex justify-between items-center text-xs text-slate-700">
+                           <div className="flex items-center gap-2">
+                             <UserPlus className="w-3.5 h-3.5 text-purple-500" />
+                             <span className="font-medium">Persona Extra ({extraPeople})</span>
+                           </div>
+                           <span className="font-mono font-bold">${extraPersonCost.toFixed(2)}</span>
+                        </div>
+                      )}
 
                       {/* Items List */}
                       {allItems.length > 0 && (
@@ -336,7 +349,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                     </div>
                   )}
 
-                  {/* Controls Indicators (Standard View) */}
+                  {/* Controls Indicators */}
                   {((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0) && (
                     <div className="flex gap-2 pt-1">
                       {(room.tvControlCount || 0) > 0 && (
@@ -365,7 +378,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             </>
           )}
           
-          {/* --- OTHER STATUS VIEWS --- */}
           {room.status === RoomStatus.AVAILABLE && (
             <div className="flex items-center text-sm gap-2 opacity-60 py-4">
               <Sparkles className="w-4 h-4" />
@@ -389,7 +401,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         </div>
       </div>
 
-      {/* Footer / Main Buttons */}
       <div className={`mt-4 pt-4 border-t ${room.status === RoomStatus.OCCUPIED ? 'border-white/20' : 'border-black/5'}`}>
         {room.status === RoomStatus.OCCUPIED ? (
           <button 
@@ -411,7 +422,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             )}
           </button>
         ) : (
-          /* Standard Buttons for other statuses */
           <div className="flex gap-2">
             {room.status === RoomStatus.AVAILABLE && (
               <button 

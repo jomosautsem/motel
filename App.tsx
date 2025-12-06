@@ -32,11 +32,11 @@ import { EmployeesManager } from './components/EmployeesManager';
 import { ExpensesManager } from './components/ExpensesManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
+import { ConfirmationModal } from './components/ConfirmationModal';
 import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
 
-// Helper to create date from now + hours (kept for logic util, not data source)
 const createTime = (hoursFromNow: number) => {
   const d = new Date();
   d.setHours(d.getHours() + hoursFromNow);
@@ -44,7 +44,6 @@ const createTime = (hoursFromNow: number) => {
 }
 
 export default function App() {
-  // --- STATE ---
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
@@ -53,7 +52,6 @@ export default function App() {
   
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   
-  // Data State (Empty initially, filled from DB)
   const [rooms, setRooms] = useState<Room[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [consumptions, setConsumptions] = useState<Consumption[]>([]);
@@ -61,7 +59,6 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [expensesList, setExpensesList] = useState<Expense[]>([]);
 
-  // UI State
   const [foodModalOpen, setFoodModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -72,14 +69,15 @@ export default function App() {
   const [changeRoomModalOpen, setChangeRoomModalOpen] = useState(false);
   const [selectedRoomForChange, setSelectedRoomForChange] = useState<Room | null>(null);
   
+  // Add Person Modal State
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [selectedRoomForAddPerson, setSelectedRoomForAddPerson] = useState<Room | null>(null);
+  
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
-  // --- INITIALIZATION ---
-  
   useEffect(() => {
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchData();
@@ -104,14 +102,12 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Rooms
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
         .select('*')
-        .order('id', { ascending: true }); // String sort might need custom logic for '9A'
+        .order('id', { ascending: true });
       
       if (roomsData) {
-        // Custom sort for numeric + suffix IDs (1, 2, ... 9A, 9B, 10)
         const sortedRooms = roomsData.sort((a: any, b: any) => {
            const numA = parseInt(a.id.replace(/\D/g, ''));
            const numB = parseInt(b.id.replace(/\D/g, ''));
@@ -135,11 +131,9 @@ export default function App() {
         setRooms(sortedRooms);
       }
 
-      // 2. Products
       const { data: prodData } = await supabase.from('products').select('*');
       if (prodData) setProducts(prodData);
 
-      // 3. Employees
       const { data: empData } = await supabase.from('employees').select('*');
       if (empData) {
         setEmployees(empData.map((e: any) => ({
@@ -148,20 +142,16 @@ export default function App() {
         })));
       }
 
-      // 4. Expenses (Shift Logic would go here in real query, getting all for now)
       const { data: expData } = await supabase.from('expenses').select('*').order('date', { ascending: false });
       if (expData) {
         setExpensesList(expData.map((e: any) => ({ ...e, date: new Date(e.date) })));
       }
 
-      // 5. Vehicle Reports
       const { data: repData } = await supabase.from('vehicle_reports').select('*').order('date', { ascending: false });
       if (repData) {
         setVehicleReports(repData.map((r: any) => ({ ...r, date: new Date(r.date) })));
       }
 
-      // 6. Consumptions (Complex: Fetch Header + Items)
-      // For simplicity in this demo, we fetch all. In prod, limit by date.
       const { data: consData } = await supabase
         .from('consumptions')
         .select(`
@@ -204,20 +194,15 @@ export default function App() {
     return { name: 'Nocturno', icon: Moon, color: 'text-indigo-500', bg: 'bg-indigo-100' };
   };
 
-  // Helper function to get the start Date of the current shift
   const getShiftStartTime = () => {
     const now = new Date(currentTime);
     const hour = now.getHours();
-    
-    // Matutino: 07:00
     if (hour >= 7 && hour < 14) {
       now.setHours(7, 0, 0, 0);
     } 
-    // Vespertino: 14:00
     else if (hour >= 14 && hour < 21) {
       now.setHours(14, 0, 0, 0);
     } 
-    // Nocturno: 21:00 (Starts previous day if we are between 00:00-07:00)
     else {
       if (hour < 7) {
         now.setDate(now.getDate() - 1);
@@ -242,7 +227,6 @@ export default function App() {
       setLoading(false);
     } else {
       setError('');
-      // Session updates automatically via onAuthStateChange
     }
   };
 
@@ -256,7 +240,6 @@ export default function App() {
       return;
     }
 
-    // VALIDATION: Prevent releasing room if controls are not returned
     if (newStatus === RoomStatus.CLEANING) {
       const room = rooms.find(r => r.id === roomId);
       if (room && ((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0)) {
@@ -264,30 +247,25 @@ export default function App() {
            message: "⚠️ No se puede liberar: Controles pendientes de devolución.", 
            type: 'error' 
          });
-         // Open controls modal automatically to facilitate return
          setSelectedRoomForControls(room);
          setControlsModalOpen(true);
          return;
       }
 
-      // HISTORY LOGIC: Save Rent to History Table when Releasing
       if (room && room.status === RoomStatus.OCCUPIED) {
-         // Calculate net rent (Total - Consumptions)
          const roomConsumptions = consumptions
            .filter(c => c.roomId === roomId && c.status === 'Pendiente en Habitación')
            .reduce((acc, c) => acc + c.totalAmount, 0);
          
          const netRent = (room.totalPrice || 0) - roomConsumptions;
 
-         // 1. Insert into room_history
          await supabase.from('room_history').insert({
            room_id: roomId,
            total_price: netRent,
            check_in_time: room.checkInTime,
-           check_out_time: new Date() // Actual release time
+           check_out_time: new Date()
          });
 
-         // 2. Mark consumptions as Paid
          await supabase.from('consumptions')
            .update({ status: 'Pagado' })
            .eq('room_id', roomId)
@@ -295,10 +273,8 @@ export default function App() {
       }
     }
 
-    // Optimistic Update
     setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r));
 
-    // DB Update: Reset fields if becoming available/cleaning
     const isReset = newStatus === RoomStatus.AVAILABLE || newStatus === RoomStatus.CLEANING;
     const updateData = isReset ? {
       status: newStatus,
@@ -320,7 +296,7 @@ export default function App() {
 
     if (error) {
       setToast({ message: "Error actualizando habitación", type: "error" });
-      fetchData(); // Revert on error
+      fetchData();
     }
   };
 
@@ -340,7 +316,6 @@ export default function App() {
         total_price: data.totalPrice
       };
 
-      // Optimistic
       setRooms(prev => prev.map(r => 
         r.id === selectedRoomForOccupancy.id 
           ? { ...r, ...data, status: RoomStatus.OCCUPIED } 
@@ -350,7 +325,6 @@ export default function App() {
       setOccupancyModalOpen(false);
       setSelectedRoomForOccupancy(null);
 
-      // DB Update
       const { error } = await supabase
         .from('rooms')
         .update(updatePayload)
@@ -364,7 +338,6 @@ export default function App() {
     }
   };
 
-  // --- CONTROLS LOGIC ---
   const handleOpenControls = (room: Room) => {
     setSelectedRoomForControls(room);
     setControlsModalOpen(true);
@@ -385,7 +358,6 @@ export default function App() {
     }).eq('id', roomId);
   };
 
-  // --- CHANGE ROOM LOGIC ---
   const handleChangeRoom = (room: Room) => {
     setSelectedRoomForChange(room);
     setChangeRoomModalOpen(true);
@@ -399,7 +371,6 @@ export default function App() {
     const targetId = targetRoomId;
 
     try {
-      // 1. Update Target Room with Source Data
       const { error: targetError } = await supabase.from('rooms').update({
         status: RoomStatus.OCCUPIED,
         client_name: selectedRoomForChange.clientName,
@@ -412,14 +383,12 @@ export default function App() {
         check_in_time: selectedRoomForChange.checkInTime,
         check_out_time: selectedRoomForChange.checkOutTime,
         total_price: selectedRoomForChange.totalPrice,
-        // Reset controls on new room as they are physical to the room
         tv_control_count: 0, 
         ac_control_count: 0
       }).eq('id', targetId);
 
       if (targetError) throw targetError;
 
-      // 2. Move Active Consumptions
       const { error: consError } = await supabase.from('consumptions')
         .update({ room_id: targetId })
         .eq('room_id', sourceId)
@@ -427,7 +396,6 @@ export default function App() {
       
       if (consError) throw consError;
 
-      // 3. Clear Source Room (Set to Cleaning)
       const { error: sourceError } = await supabase.from('rooms').update({
         status: RoomStatus.CLEANING,
         client_name: null,
@@ -440,17 +408,16 @@ export default function App() {
         check_out_time: null,
         people_count: 2,
         total_price: null,
-        tv_control_count: 0, // Assume controls stay in the old room or are returned
+        tv_control_count: 0,
         ac_control_count: 0
       }).eq('id', sourceId);
 
       if (sourceError) throw sourceError;
 
-      // Success
       setToast({ message: `Cambio de Habitación ${sourceId} a ${targetId} exitoso.`, type: 'success' });
       setChangeRoomModalOpen(false);
       setSelectedRoomForChange(null);
-      fetchData(); // Refresh all state
+      fetchData();
 
     } catch (e) {
       console.error("Change Room Error:", e);
@@ -460,21 +427,28 @@ export default function App() {
   };
 
   // --- ADD EXTRA PERSON LOGIC ---
-  const handleAddPerson = async (room: Room) => {
-    // Logic: Standard Occupancy is 2. Max 3.
-    // If current count >= 3, disallow.
+  const handleAddPersonClick = (room: Room) => {
     const currentPeople = room.peopleCount || 2;
     if (currentPeople >= 3) {
       setToast({ message: "Límite alcanzado: Solo se permite 1 persona extra.", type: 'error' });
       return;
     }
+    setSelectedRoomForAddPerson(room);
+    setConfirmationModalOpen(true);
+  };
 
+  const confirmAddPerson = async () => {
+    if (!selectedRoomForAddPerson) return;
+    
+    const room = selectedRoomForAddPerson;
+    const currentPeople = room.peopleCount || 2;
     const newCount = currentPeople + 1;
     const extraCharge = 150;
     const newTotal = (room.totalPrice || 0) + extraCharge;
 
-    // Optimistic Update
     setRooms(prev => prev.map(r => r.id === room.id ? { ...r, peopleCount: newCount, totalPrice: newTotal } : r));
+    setConfirmationModalOpen(false);
+    setSelectedRoomForAddPerson(null);
 
     const { error } = await supabase.from('rooms').update({
       people_count: newCount,
@@ -483,7 +457,7 @@ export default function App() {
 
     if (error) {
       setToast({ message: "Error al agregar persona", type: 'error' });
-      fetchData(); // Revert
+      fetchData();
     } else {
       setToast({ message: `Persona extra agregada (+$${extraCharge}).`, type: 'success' });
     }
@@ -493,7 +467,6 @@ export default function App() {
     const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
     
     try {
-      // 1. Insert Consumption Header
       const { data: cons, error: consError } = await supabase
         .from('consumptions')
         .insert({
@@ -506,7 +479,6 @@ export default function App() {
       
       if (consError) throw consError;
 
-      // 2. Insert Items
       const itemsPayload = items.map(item => ({
         consumption_id: cons.id,
         product_id: item.productId,
@@ -519,13 +491,11 @@ export default function App() {
       const { error: itemsError } = await supabase.from('consumption_items').insert(itemsPayload);
       if (itemsError) throw itemsError;
 
-      // 3. Update Room Total Price
       const room = rooms.find(r => r.id === roomId);
       const newTotal = (room?.totalPrice || 0) + totalAmount;
       
       await supabase.from('rooms').update({ total_price: newTotal }).eq('id', roomId);
 
-      // Refresh data
       fetchData();
       setFoodModalOpen(false);
       setToast({
@@ -559,7 +529,6 @@ export default function App() {
     }
   };
 
-  // --- EMPLOYEE HANDLERS ---
   const handleAddEmployee = async (data: Omit<Employee, 'id' | 'joinedDate'>) => {
     const { error } = await supabase.from('employees').insert(data);
     if (!error) {
@@ -581,8 +550,6 @@ export default function App() {
       const { error } = await supabase.from('employees').delete().eq('id', id);
       
       if (error) {
-        console.error("Error deleting employee:", error);
-        // Postgres foreign key violation code: 23503
         if (error.code === '23503') {
            setToast({ message: "No se puede eliminar: El empleado tiene historial de ventas.", type: 'error' });
         } else {
@@ -630,7 +597,6 @@ export default function App() {
     }
   };
 
-  // --- EXPENSE HANDLERS ---
   const handleAddExpense = async (description: string, amount: number) => {
     const { error } = await supabase.from('expenses').insert({ description, amount });
     if (!error) {
@@ -649,7 +615,6 @@ export default function App() {
 
   const handleGenerateReport = async () => {
     setIsAnalyzing(true);
-    // Simple mock stats for context, in real app calculate from history
     const context = `
       Estado Actual Habitaciones: ${rooms.filter(r => r.status === RoomStatus.OCCUPIED).length} ocupadas de ${rooms.length}.
       Ingresos Turno Actual: $${(consumptions.reduce((acc, c) => acc + c.totalAmount, 0)).toFixed(2)}
@@ -659,80 +624,49 @@ export default function App() {
     setIsAnalyzing(false);
   };
 
-  // --- DASHBOARD CALCULATIONS (Live from DB State with Shift Filter) ---
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
 
-  // Filter Data by Current Shift Start Time
   const shiftStartTime = getShiftStartTime();
 
-  // 1. Shift Specific Consumptions (Items sold during this shift)
   const shiftConsumptions = consumptions.filter(c => c.timestamp >= shiftStartTime);
-
-  // 2. Shift Specific Expenses
   const shiftExpenses = expensesList.filter(e => e.date >= shiftStartTime);
-
-  // 3. Shift Specific Room Revenue 
-  // We count room revenue based on active rooms if they checked in during this shift? 
-  // No, standard motel logic usually counts revenue when room is released OR accumulates it.
-  // For this dashboard, we show what is accumulating in active rooms + what has been released.
-  // BUT the user asked for "reset to zero". 
-  // The current logic calculates 'roomRevenue' based on 'grossRoomTotal' of *Active Occupied Rooms*.
-  // It misses rooms that were occupied and released within the shift. 
-  // To fix this properly, we need the `room_history` table data, but that fetch isn't implemented in `fetchData` yet.
-  // For now, we will stick to the requested logic of filtering by timestamp, but acknowledge that released rooms are missing from this specific calc until history is fetched.
-  // *Correction*: We implemented `room_history` insert, but not fetch. 
-  // Let's rely on `activeRoomCount` for the live view as requested previously.
-  
   const shiftOccupiedRooms = rooms.filter(r => 
     r.status === RoomStatus.OCCUPIED && 
     r.checkInTime && r.checkInTime >= shiftStartTime
   );
 
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length; 
-  // Only count people for rooms that are currently OCCUPIED
   const activePeopleCount = rooms.reduce((acc, r) => {
     return r.status === RoomStatus.OCCUPIED ? acc + (r.peopleCount || 0) : acc;
   }, 0);
   
-  // GROSS Room Total for Active Rooms in THIS SHIFT
   const grossRoomTotal = shiftOccupiedRooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
-
-  // Active Consumptions (Food) for THIS SHIFT
   const activeConsumptionsTotal = shiftConsumptions
     .filter(c => c.status === 'Pendiente en Habitación' && c.roomId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
 
-  // NET Room Revenue (Pure Rent) = Gross Total - Active Consumptions
   const roomRevenue = Math.max(0, grossRoomTotal - activeConsumptionsTotal);
   
-  // Product Revenue (Sales to rooms + direct) during this shift
   const productRevenue = shiftConsumptions
     .filter(c => !c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  // Employee Consumption during this shift
   const employeeConsumption = shiftConsumptions
     .filter(c => c.employeeId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
   
-  // Total Expenses during this shift
   const totalExpenses = shiftExpenses.reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Total Shift Revenue (Summing Room Rent + Products Sold + Employee Consumptions)
-  // Note: This misses released room revenue until we fetch room_history.
   const totalShiftRevenue = roomRevenue + productRevenue + employeeConsumption;
-  
   const totalGeneral = totalShiftRevenue - totalExpenses;
 
-  // Food Stats (Shift Specific)
   const foodConsumptions = shiftConsumptions.filter(c => !c.employeeId);
   const foodTotalRevenue = foodConsumptions.reduce((acc, curr) => acc + curr.totalAmount, 0);
   const foodTotalOrders = foodConsumptions.length;
   const foodAvgTicket = foodTotalOrders > 0 ? foodTotalRevenue / foodTotalOrders : 0;
 
-  // --- LOADING / LOGIN SCREEN ---
   if (loading) {
      return (
        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
@@ -800,7 +734,6 @@ export default function App() {
     );
   }
 
-  // --- DASHBOARD LAYOUT ---
   const SidebarItem = ({ view, icon: Icon, label }: { view: AppView, icon: any, label: string }) => (
     <button
       onClick={() => setCurrentView(view)}
@@ -818,7 +751,6 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* Sidebar */}
       <aside className="w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col p-6 shadow-sm z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="w-10 h-10 bg-rose-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
@@ -859,10 +791,8 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         
-        {/* Header */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
           <div className="flex items-center gap-4">
             <h2 className="text-2xl font-bold text-slate-800">{currentView}</h2>
@@ -884,15 +814,11 @@ export default function App() {
           </div>
         </header>
 
-        {/* Scrollable View Area */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 relative">
           
-          {/* Dashboard View */}
           {currentView === AppView.DASHBOARD && (
             <div className="space-y-8 animate-fade-in">
-              {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Occupancy */}
                 <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-white/10 transition"></div>
                   <div className="relative z-10">
@@ -909,7 +835,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Current Shift Revenue */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 group hover:border-blue-200 transition">
                    <div className="flex justify-between items-start mb-4">
                       <div className="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition">
@@ -921,7 +846,6 @@ export default function App() {
                    <p className="text-xs text-blue-500 font-medium mt-1">Turno en curso</p>
                 </div>
 
-                {/* Active People */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 group hover:border-purple-200 transition">
                    <div className="flex justify-between items-start mb-4">
                       <div className="p-3 bg-purple-50 rounded-xl text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition">
@@ -933,7 +857,6 @@ export default function App() {
                    <p className="text-xs text-purple-500 font-medium mt-1">Huéspedes actuales</p>
                 </div>
 
-                {/* Other Shift Revenue */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 opacity-60 hover:opacity-100 transition">
                    <div className="flex justify-between items-start mb-4">
                       <div className="p-3 bg-slate-50 rounded-xl text-slate-500">
@@ -946,13 +869,11 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Financial Breakdown Row */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                  <div className="bg-green-50 border border-green-100 rounded-xl p-4 flex flex-col justify-between h-24">
                     <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
                        <BedDouble className="w-4 h-4" /> Ingresos por Habitaciones
                     </div>
-                    {/* Display NET Room Revenue (Pure Rent) */}
                     <p className="text-2xl font-bold text-green-800 text-right">{formatCurrency(roomRevenue)}</p>
                  </div>
                  
@@ -978,7 +899,6 @@ export default function App() {
                  </div>
               </div>
 
-              {/* Total Banner */}
               <div className="bg-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-500/30 flex justify-between items-center">
                  <div className="flex items-center gap-3">
                    <div className="p-3 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -989,7 +909,6 @@ export default function App() {
                  <p className="text-4xl font-bold font-mono tracking-tight">{formatCurrency(totalGeneral)}</p>
               </div>
 
-              {/* Compact Room Grid */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <BedDouble className="w-5 h-5 text-rose-500" />
@@ -1009,7 +928,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Rooms View */}
           {currentView === AppView.ROOMS && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
               {rooms.map(room => (
@@ -1020,13 +938,12 @@ export default function App() {
                   onStatusChange={handleStatusChange}
                   onOpenControls={handleOpenControls}
                   onChangeRoom={handleChangeRoom}
-                  onAddPerson={handleAddPerson}
+                  onAddPerson={() => handleAddPersonClick(room)}
                 />
               ))}
             </div>
           )}
 
-          {/* Vehicles View */}
           {currentView === AppView.VEHICLES && (
             <VehiclesManager 
               rooms={rooms}
@@ -1035,11 +952,10 @@ export default function App() {
             />
           )}
 
-          {/* Employees View */}
           {currentView === AppView.EMPLOYEES && (
             <EmployeesManager 
               employees={employees}
-              consumptions={shiftConsumptions} // Filtered for current shift view consistency
+              consumptions={shiftConsumptions}
               onAddEmployee={handleAddEmployee}
               onEditEmployee={handleEditEmployee}
               onDeleteEmployee={handleDeleteEmployee}
@@ -1048,16 +964,14 @@ export default function App() {
             />
           )}
 
-          {/* Expenses View */}
           {currentView === AppView.EXPENSES && (
             <ExpensesManager 
-              expenses={shiftExpenses} // Filtered for current shift
+              expenses={shiftExpenses}
               onAddExpense={handleAddExpense}
               onDeleteExpense={handleDeleteExpense}
             />
           )}
 
-          {/* Food View */}
           {currentView === AppView.FOOD && (
             <div className="space-y-8 animate-fade-in">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0f172a] p-6 rounded-2xl shadow-lg border border-slate-700">
@@ -1188,7 +1102,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Report View */}
           {currentView === AppView.REPORTS && (
              <div className="flex flex-col items-center justify-center min-h-[500px] text-center space-y-6">
                 <div className="bg-white p-8 rounded-3xl shadow-xl max-w-2xl w-full border border-slate-100">
@@ -1232,7 +1145,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* MODALS */}
       {selectedRoomForOccupancy && (
         <OccupancyModal 
           room={selectedRoomForOccupancy}
@@ -1251,13 +1163,23 @@ export default function App() {
         />
       )}
       
-      {/* Change Room Modal */}
       <ChangeRoomModal
         isOpen={changeRoomModalOpen}
         onClose={() => setChangeRoomModalOpen(false)}
         sourceRoom={selectedRoomForChange}
         availableRooms={rooms.filter(r => r.status === RoomStatus.AVAILABLE)}
         onConfirm={handleConfirmChangeRoom}
+      />
+      
+      {/* ADD PERSON CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={confirmationModalOpen}
+        onClose={() => setConfirmationModalOpen(false)}
+        onConfirm={confirmAddPerson}
+        title="Confirmar Persona Extra"
+        message={`¿Está seguro de agregar una persona extra a la Habitación ${selectedRoomForAddPerson?.id}? Se cargará un costo adicional de $150.00.`}
+        confirmText="Sí, Agregar (+ $150)"
+        type="warning"
       />
 
       <FoodConsumptionModal
@@ -1274,7 +1196,6 @@ export default function App() {
         onSave={handleAddProduct}
       />
       
-      {/* Toast Notification */}
       {toast && (
         <Toast 
           message={toast.message} 
