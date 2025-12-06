@@ -45,7 +45,8 @@ export enum AppView {
   REPORTS = 'Reportes',
   EMPLOYEES = 'Empleados',
   EXPENSES = 'Gastos',
-  TRANSFERS = 'Transferencias'
+  TRANSFERS = 'Transferencias',
+  HISTORY = 'Historial'
 }
 
 export interface Expense {

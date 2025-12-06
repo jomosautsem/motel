@@ -20,7 +20,8 @@ import {
   DollarSign,
   Package,
   Receipt,
-  Coffee
+  Coffee,
+  CalendarClock
 } from 'lucide-react';
 import { RoomCard } from './components/RoomCard';
 import { OccupancyModal } from './components/OccupancyModal';
@@ -30,6 +31,7 @@ import { ProductModal } from './components/ProductModal';
 import { VehiclesManager } from './components/VehiclesManager';
 import { EmployeesManager } from './components/EmployeesManager';
 import { ExpensesManager } from './components/ExpensesManager';
+import { ShiftHistoryManager } from './components/ShiftHistoryManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -880,6 +882,7 @@ export default function App() {
           <SidebarItem view={AppView.VEHICLES} icon={Car} label="Vehículos" />
           <SidebarItem view={AppView.EMPLOYEES} icon={Users} label="Empleados" />
           <SidebarItem view={AppView.EXPENSES} icon={TrendingDown} label="Gastos" />
+          <SidebarItem view={AppView.HISTORY} icon={CalendarClock} label="Historial Turnos" />
           <SidebarItem view={AppView.REPORTS} icon={FileBarChart} label="Reportes IA" />
         </nav>
 
@@ -1082,6 +1085,15 @@ export default function App() {
               expenses={shiftExpenses}
               onAddExpense={handleAddExpense}
               onDeleteExpense={handleDeleteExpense}
+            />
+          )}
+
+          {currentView === AppView.HISTORY && (
+            <ShiftHistoryManager 
+              roomHistory={roomHistory}
+              consumptions={consumptions}
+              expenses={expensesList}
+              vehicleHistory={vehicleHistory}
             />
           )}
 
