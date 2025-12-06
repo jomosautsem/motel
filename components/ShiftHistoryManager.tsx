@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { RoomHistoryEntry, Consumption, Expense, VehicleLog } from '../types';
-import { Calendar, FileText, Download, Filter, Search, AlertCircle } from 'lucide-react';
+import { Calendar, FileText, Download, Filter, Search, AlertCircle, History } from 'lucide-react';
 
 interface ShiftHistoryManagerProps {
   roomHistory: RoomHistoryEntry[];
@@ -40,9 +40,10 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
   };
 
   // Helper to calculate duration string
-  const getDurationString = (start: Date, end: Date) => {
-    if (!start || !end) return '-';
+  const getDurationString = (start?: Date, end?: Date) => {
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
     const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return '-'; // Invalid range
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
@@ -51,8 +52,6 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
   // Logic to infer Paid Hours from Price
   const getPaidHours = (price: number) => {
     // 2hr $220, 4hr $280, 5hr $300, 8hr $330, 12hr $480
-    // We assume standard rates. Extra people or penalties might skew this slightly, 
-    // but it serves as a good baseline for auditing.
     if (price <= 240) return 2;
     if (price <= 290) return 4;
     if (price <= 315) return 5;
@@ -66,7 +65,10 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
     // 1. Room History (Completed Rents)
     // FIX: Filter by checkInTime (when the sale was made) not createdAt (release time)
-    const fRooms = roomHistory.filter(h => h.checkInTime >= start && h.checkInTime <= end);
+    const fRooms = roomHistory.filter(h => {
+        if (!h.checkInTime) return false;
+        return h.checkInTime >= start && h.checkInTime <= end;
+    });
 
     // 2. Consumptions (Sales)
     const fCons = consumptions.filter(c => c.timestamp >= start && c.timestamp <= end);
@@ -146,17 +148,25 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
     const roomRows = filteredRooms.map(r => {
         const paidHours = getPaidHours(r.totalPrice);
-        const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
-        const actualHours = actualMs / (1000 * 60 * 60);
-        
-        const excessMinutes = Math.floor((actualHours - paidHours) * 60);
-        const excessStr = excessMinutes > 15 ? `+${Math.floor(excessMinutes/60)}h ${excessMinutes%60}m` : '-';
+        let excessStr = '-';
+        let actualStr = '-';
+
+        if (r.checkInTime && r.checkOutTime) {
+            const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
+            const actualHours = actualMs / (1000 * 60 * 60);
+            
+            const excessMinutes = Math.floor((actualHours - paidHours) * 60);
+            if (excessMinutes > 15) {
+                excessStr = `+${Math.floor(excessMinutes/60)}h ${excessMinutes%60}m`;
+            }
+            actualStr = getDurationString(r.checkInTime, r.checkOutTime);
+        }
 
         return [
           `Hab ${r.roomId}`,
           r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
           r.checkOutTime ? r.checkOutTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
-          getDurationString(r.checkInTime, r.checkOutTime),
+          actualStr,
           `$${r.totalPrice.toFixed(2)}`,
           excessStr // New Column
         ];
@@ -322,10 +332,16 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
                 <>
                   {filteredRooms.map(r => {
                      const paidHours = getPaidHours(r.totalPrice);
-                     const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
-                     const actualHours = actualMs / (1000 * 60 * 60);
-                     const excessMinutes = Math.floor((actualHours - paidHours) * 60);
-                     const hasExcess = excessMinutes > 15;
+                     let excessStr = null;
+                     
+                     if (r.checkInTime && r.checkOutTime) {
+                        const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
+                        const actualHours = actualMs / (1000 * 60 * 60);
+                        const excessMinutes = Math.floor((actualHours - paidHours) * 60);
+                        if (excessMinutes > 15) {
+                            excessStr = `+${Math.floor(excessMinutes)}m`;
+                        }
+                     }
 
                      return (
                         <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
@@ -333,9 +349,9 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
                               <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
                               <div className="flex gap-2 text-xs">
                                 <span className="text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
-                                {hasExcess && (
+                                {excessStr && (
                                     <span className="text-rose-500 font-bold flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" /> Exceso +{Math.floor(excessMinutes)}m
+                                        <AlertCircle className="w-3 h-3" /> Exceso {excessStr}
                                     </span>
                                 )}
                               </div>

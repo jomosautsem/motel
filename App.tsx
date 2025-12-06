@@ -162,9 +162,9 @@ export default function App() {
           id: h.id,
           roomId: h.room_id,
           totalPrice: h.total_price,
-          checkInTime: new Date(h.check_in_time),
-          checkOutTime: new Date(h.check_out_time),
-          createdAt: new Date(h.created_at)
+          checkInTime: h.check_in_time ? new Date(h.check_in_time) : undefined,
+          checkOutTime: h.check_out_time ? new Date(h.check_out_time) : undefined,
+          createdAt: h.created_at ? new Date(h.created_at) : new Date()
         })));
       }
 
@@ -311,9 +311,9 @@ export default function App() {
               id: h.id,
               roomId: h.room_id,
               totalPrice: h.total_price,
-              checkInTime: new Date(h.check_in_time),
-              checkOutTime: new Date(h.check_out_time),
-              createdAt: new Date(h.created_at)
+              checkInTime: h.check_in_time ? new Date(h.check_in_time) : undefined,
+              checkOutTime: h.check_out_time ? new Date(h.check_out_time) : undefined,
+              createdAt: h.created_at ? new Date(h.created_at) : new Date()
             })));
          }
 
@@ -740,17 +740,21 @@ export default function App() {
 
   const shiftConsumptions = consumptions.filter(c => c.timestamp >= shiftStartTime);
   const shiftExpenses = expensesList.filter(e => e.date >= shiftStartTime);
+  
+  // Filter active rooms by checkInTime (entry time)
   const shiftOccupiedRooms = rooms.filter(r => 
     r.status === RoomStatus.OCCUPIED && 
     r.checkInTime && r.checkInTime >= shiftStartTime
   );
   
-  // FIX: Filter by checkInTime instead of createdAt (release time)
-  // This ensures revenue belongs to the shift where check-in happened
-  const shiftHistory = roomHistory.filter(h => h.checkInTime >= shiftStartTime);
+  // FIX: Filter history by checkInTime (entry time) to ensure revenue attribution is consistent
+  // If a room entered at 22:00 (Night) and is released at 08:00 (Morning), it should NOT be in the Morning dashboard.
+  const shiftHistory = roomHistory.filter(h => h.checkInTime && h.checkInTime >= shiftStartTime);
+  
   const historyRevenue = shiftHistory.reduce((acc, h) => acc + h.totalPrice, 0);
 
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length; 
+  // Fix active people count to only include occupied rooms
   const activePeopleCount = rooms.reduce((acc, r) => {
     return r.status === RoomStatus.OCCUPIED ? acc + (r.peopleCount || 0) : acc;
   }, 0);
