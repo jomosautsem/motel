@@ -33,7 +33,7 @@ import { ExpensesManager } from './components/ExpensesManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense } from './types';
+import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
 
@@ -58,6 +58,7 @@ export default function App() {
   const [vehicleReports, setVehicleReports] = useState<VehicleReport[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [expensesList, setExpensesList] = useState<Expense[]>([]);
+  const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
 
   const [foodModalOpen, setFoodModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -145,6 +146,18 @@ export default function App() {
       const { data: expData } = await supabase.from('expenses').select('*').order('date', { ascending: false });
       if (expData) {
         setExpensesList(expData.map((e: any) => ({ ...e, date: new Date(e.date) })));
+      }
+      
+      const { data: histData } = await supabase.from('room_history').select('*').order('created_at', { ascending: false });
+      if (histData) {
+        setRoomHistory(histData.map((h: any) => ({
+          id: h.id,
+          roomId: h.room_id,
+          totalPrice: h.total_price,
+          checkInTime: new Date(h.check_in_time),
+          checkOutTime: new Date(h.check_out_time),
+          createdAt: new Date(h.created_at)
+        })));
       }
 
       const { data: repData } = await supabase.from('vehicle_reports').select('*').order('date', { ascending: false });
@@ -297,6 +310,11 @@ export default function App() {
     if (error) {
       setToast({ message: "Error actualizando habitación", type: "error" });
       fetchData();
+    } else {
+      // Refresh data to get the new history entry immediately
+      if (newStatus === RoomStatus.CLEANING) {
+        fetchData(); 
+      }
     }
   };
 
@@ -636,18 +654,27 @@ export default function App() {
     r.status === RoomStatus.OCCUPIED && 
     r.checkInTime && r.checkInTime >= shiftStartTime
   );
+  
+  // -- NEW: HISTORY FILTERING --
+  const shiftHistory = roomHistory.filter(h => h.createdAt >= shiftStartTime);
+  const historyRevenue = shiftHistory.reduce((acc, h) => acc + h.totalPrice, 0);
 
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length; 
   const activePeopleCount = rooms.reduce((acc, r) => {
     return r.status === RoomStatus.OCCUPIED ? acc + (r.peopleCount || 0) : acc;
   }, 0);
   
+  // Calculate ACTIVE revenue (currently occupied)
   const grossRoomTotal = shiftOccupiedRooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
   const activeConsumptionsTotal = shiftConsumptions
     .filter(c => c.status === 'Pendiente en Habitación' && c.roomId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
 
-  const roomRevenue = Math.max(0, grossRoomTotal - activeConsumptionsTotal);
+  // activeRent = Total Price on Room - Active Consumptions on Room
+  const activeRoomRentRevenue = Math.max(0, grossRoomTotal - activeConsumptionsTotal);
+  
+  // TOTAL ROOM REVENUE = Active Rents + Finished (History) Rents
+  const roomRevenue = activeRoomRentRevenue + historyRevenue;
   
   const productRevenue = shiftConsumptions
     .filter(c => !c.employeeId)

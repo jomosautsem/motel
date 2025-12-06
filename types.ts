@@ -28,6 +28,15 @@ export interface Room {
   acControlCount?: number;
 }
 
+export interface RoomHistoryEntry {
+  id: string;
+  roomId: string;
+  totalPrice: number;
+  checkInTime: Date;
+  checkOutTime: Date;
+  createdAt: Date;
+}
+
 export enum AppView {
   DASHBOARD = 'Dashboard',
   ROOMS = 'Habitaciones',
