@@ -728,7 +728,6 @@ const App: React.FC = () => {
   };
 
   const handleAddVehicleReport = async (reportData: any) => {
-    // Attempt to save full data first
     const { error } = await supabase.from('vehicle_reports').insert({
         plate: reportData.plate,
         brand: reportData.brand,
@@ -739,8 +738,7 @@ const App: React.FC = () => {
     });
 
     if (error) {
-        // Fallback: If 'brand' column doesn't exist yet, save basic report
-        if (error.code === '42703') { // Undefined column
+        if (error.code === '42703') { // Fallback if brand/model columns missing
              const { error: retryError } = await supabase.from('vehicle_reports').insert({
                 plate: reportData.plate,
                 description: reportData.description,
@@ -758,6 +756,17 @@ const App: React.FC = () => {
     } else {
         await fetchData();
         showToast('Reporte vehicular creado', 'warning');
+    }
+  };
+
+  // NEW: Delete Report Handler
+  const handleDeleteVehicleReport = async (id: string) => {
+    const { error } = await supabase.from('vehicle_reports').delete().eq('id', id);
+    if (error) {
+      showToast("Error al eliminar reporte", "error");
+    } else {
+      setVehicleReports(prev => prev.filter(r => r.id !== id));
+      showToast("Reporte eliminado correctamente", "warning");
     }
   };
 
@@ -1036,6 +1045,7 @@ const App: React.FC = () => {
             rooms={rooms}
             reports={vehicleReports}
             onAddReport={handleAddVehicleReport}
+            onDeleteReport={handleDeleteVehicleReport}
             vehicleHistory={vehicleHistory}
           />
         );

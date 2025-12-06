@@ -1,19 +1,25 @@
 
 import React, { useState } from 'react';
 import { Room, RoomStatus, VehicleReport, VehicleLog } from '../types';
-import { Car, Bike, Footprints, AlertTriangle, PlusCircle, Search, User, MapPin, Clock, History, Calendar } from 'lucide-react';
+import { Car, Bike, Footprints, AlertTriangle, PlusCircle, User, MapPin, Clock, History, Trash2 } from 'lucide-react';
 import { VehicleReportModal } from './VehicleReportModal';
+import { PasswordModal } from './PasswordModal';
 
 interface VehiclesManagerProps {
   rooms: Room[];
   reports: VehicleReport[];
   onAddReport: (report: Omit<VehicleReport, 'id' | 'date'>) => void;
+  onDeleteReport: (id: string) => void;
   vehicleHistory?: VehicleLog[];
 }
 
-export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports, onAddReport, vehicleHistory = [] }) => {
+export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports, onAddReport, onDeleteReport, vehicleHistory = [] }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+  
+  // Password Modal State for Delete
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
 
   // Stats
   const occupiedRooms = rooms.filter(r => r.status === RoomStatus.OCCUPIED);
@@ -30,6 +36,19 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
       model: r.vehicleModel || '',
       room: r.id
     }));
+
+  const handleDeleteClick = (id: string) => {
+    setReportToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (reportToDelete) {
+      onDeleteReport(reportToDelete);
+      setDeleteModalOpen(false);
+      setReportToDelete(null);
+    }
+  };
 
   return (
     <div className="animate-fade-in space-y-8 min-h-full">
@@ -119,8 +138,16 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {reports.map(report => (
-              <div key={report.id} className="border border-l-4 border-l-rose-500 rounded-xl p-4 bg-rose-50/50 hover:bg-rose-50 transition">
-                <div className="flex justify-between items-start mb-2">
+              <div key={report.id} className="border border-l-4 border-l-rose-500 rounded-xl p-4 bg-rose-50/50 hover:bg-rose-50 transition relative group">
+                <button 
+                  onClick={() => handleDeleteClick(report.id)}
+                  className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition opacity-0 group-hover:opacity-100"
+                  title="Eliminar Reporte"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+                <div className="flex justify-between items-start mb-2 pr-8">
                   <span className="font-mono font-bold text-slate-800 text-lg bg-white px-2 py-0.5 rounded border border-rose-100">{report.plate}</span>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
                     report.severity === 'Alta' ? 'bg-rose-600 text-white' : 
@@ -291,6 +318,16 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
         onClose={() => setModalOpen(false)}
         onSave={onAddReport}
         knownVehicles={activeVehicles}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <PasswordModal 
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        requiredPassword="reportesj5s82QSM"
+        title="Eliminar Reporte"
+        message="Esta acción eliminará el reporte vehicular permanentemente. Ingrese contraseña."
       />
 
     </div>
