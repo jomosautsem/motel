@@ -1,15 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, Car, Bike, Footprints, Calendar, Clock, DollarSign, User, Users } from 'lucide-react';
-import { Room } from '../types';
+import { X, Car, Bike, Footprints, Calendar, Clock, DollarSign, User, Users, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Room, VehicleReport } from '../types';
 
 interface OccupancyModalProps {
   room: Room;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (data: any) => void;
+  reports: VehicleReport[];
 }
 
-export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, onClose, onConfirm }) => {
+export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, onClose, onConfirm, reports }) => {
   const [clientName, setClientName] = useState('');
   const [peopleCount, setPeopleCount] = useState(2);
   const [entryType, setEntryType] = useState<'Auto' | 'Moto' | 'Pie'>('Auto');
@@ -27,6 +29,9 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
   
   // Price
   const [price, setPrice] = useState(280);
+
+  // Security Alert State
+  const [securityAlert, setSecurityAlert] = useState<{message: string, severity: 'Alta'|'Media'|'Baja'} | null>(null);
 
   // Initialize form on open
   useEffect(() => {
@@ -51,8 +56,29 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
       setModel('');
       setColor('');
       setPlate('');
+      setSecurityAlert(null);
     }
   }, [isOpen, room.id]);
+
+  // Blacklist Check Logic
+  useEffect(() => {
+    if (!plate || plate.length < 3) {
+      setSecurityAlert(null);
+      return;
+    }
+
+    const cleanPlate = plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const foundReport = reports.find(r => r.plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanPlate);
+
+    if (foundReport) {
+      setSecurityAlert({
+        message: foundReport.description,
+        severity: foundReport.severity
+      });
+    } else {
+      setSecurityAlert(null);
+    }
+  }, [plate, reports]);
 
   // Pricing Logic Helper
   const calculatePrice = (hours: number) => {
@@ -125,6 +151,9 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Block submission if High Severity alert exists
+    if (securityAlert?.severity === 'Alta') return;
 
     const now = new Date();
     
@@ -277,14 +306,47 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
                       onChange={(e) => setColor(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none bg-white"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="Placas (ABC1234)"
-                      value={plate}
-                      onChange={(e) => setPlate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none bg-white"
-                    />
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Placas (ABC1234)"
+                        value={plate}
+                        onChange={(e) => setPlate(e.target.value)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 focus:ring-2 outline-none font-bold uppercase transition ${
+                          securityAlert?.severity === 'Alta' 
+                            ? 'border-red-500 focus:ring-red-200 text-red-600 bg-red-50' 
+                            : securityAlert?.severity === 'Media' || securityAlert?.severity === 'Baja'
+                              ? 'border-amber-400 focus:ring-amber-200 text-amber-700 bg-amber-50'
+                              : 'border-slate-200 focus:ring-rose-500 focus:border-rose-500 bg-white'
+                        }`}
+                      />
+                      {securityAlert && (
+                        <ShieldAlert className={`absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 ${
+                          securityAlert.severity === 'Alta' ? 'text-red-500' : 'text-amber-500'
+                        }`} />
+                      )}
+                    </div>
                   </div>
+
+                  {/* SECURITY ALERT BOX */}
+                  {securityAlert && (
+                    <div className={`p-4 rounded-xl border-l-4 shadow-sm animate-pulse ${
+                      securityAlert.severity === 'Alta' 
+                        ? 'bg-red-100 border-red-500 text-red-800' 
+                        : 'bg-amber-100 border-amber-500 text-amber-800'
+                    }`}>
+                      <div className="flex items-center gap-2 font-bold mb-1">
+                        <AlertTriangle className="w-5 h-5" />
+                        <span>
+                          {securityAlert.severity === 'Alta' ? '¡VEHÍCULO VETADO!' : 'Precaución: Vehículo con Reporte'}
+                        </span>
+                      </div>
+                      <p className="text-sm">{securityAlert.message}</p>
+                      {securityAlert.severity === 'Alta' && (
+                        <p className="text-xs font-bold mt-2 uppercase">Entrada Prohibida</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -381,10 +443,21 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
           <button 
             type="submit"
             form="occupancyForm"
-            className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-xl hover:scale-[1.01] transition transform flex items-center justify-center gap-2"
+            disabled={securityAlert?.severity === 'Alta'}
+            className={`flex-1 py-3.5 rounded-xl font-bold shadow-lg transition transform flex items-center justify-center gap-2 ${
+              securityAlert?.severity === 'Alta'
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                : 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-blue-500/30 hover:shadow-xl hover:scale-[1.01]'
+            }`}
           >
-            <span>Ocupar Habitación</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            {securityAlert?.severity === 'Alta' ? (
+              <span>Entrada Bloqueada</span>
+            ) : (
+              <>
+                <span>Ocupar Habitación</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </>
+            )}
           </button>
         </div>
       </div>

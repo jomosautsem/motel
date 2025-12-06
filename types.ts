@@ -82,8 +82,8 @@ export interface ConsumptionItem {
 
 export interface Consumption {
   id: string;
-  roomId?: string; // Optional now, as it could be an employee consumption
-  employeeId?: string; // New field for employee tracking
+  roomId?: string;
+  employeeId?: string;
   items: ConsumptionItem[];
   totalAmount: number;
   timestamp: Date;
@@ -108,17 +108,4 @@ export interface VehicleLog {
   entryType: 'Auto' | 'Moto';
   entryTime: Date;
   exitTime?: Date;
-}
-
-export interface CashCut {
-  id: string;
-  shiftName: string;
-  openingTime: Date;
-  closingTime?: Date;
-  initialAmount: number;
-  finalDeclaredAmount?: number;
-  systemExpectedAmount?: number;
-  difference?: number;
-  status: 'open' | 'closed';
-  notes?: string;
 }
