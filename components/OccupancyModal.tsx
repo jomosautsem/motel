@@ -56,21 +56,22 @@ export const OccupancyModal: React.FC<OccupancyModalProps> = ({ room, isOpen, on
 
   // Pricing Logic Helper
   const calculatePrice = (hours: number) => {
-    // Basic logic: 
-    // < 2 hours: $220
-    // 4 hours: $280
-    // 5-8 hours: +$50/hr roughly
-    // 12 hours: $480
+    // Tarifas Actualizadas:
+    // 2hr $220
+    // 4hr $280
+    // 5hr $300
+    // 8hr $330
+    // 12hr $480
     
-    // We can make a simple formula or buckets
-    if (hours <= 2) return 220;
-    if (hours <= 4.5) return 280; // Standard 4h block allows a little grace
-    if (hours <= 6) return 330;
-    if (hours <= 8) return 380;
-    if (hours <= 12) return 480;
+    // Usamos un pequeño margen (0.1) para errores de redondeo en cálculos de tiempo
+    if (hours <= 2.1) return 220;
+    if (hours <= 4.1) return 280;
+    if (hours <= 5.1) return 300;
+    if (hours <= 8.1) return 330;
+    if (hours <= 12.1) return 480;
     
-    // If more than 12, add per hour
-    return 480 + (Math.round(hours - 12) * 50);
+    // Si es más de 12 horas, cobramos $50 extra por hora adicional (lógica existente mantenida como fallback)
+    return 480 + (Math.ceil(hours - 12) * 50);
   };
 
   // Effect to automatically calculate price when times change

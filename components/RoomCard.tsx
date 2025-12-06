@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Room, RoomStatus, Consumption } from '../types';
 import { 
@@ -23,7 +24,9 @@ import {
   ArrowRight,
   Receipt,
   BedDouble,
-  ShoppingCart
+  ShoppingCart,
+  Tv,
+  Thermometer
 } from 'lucide-react';
 
 interface RoomCardProps {
@@ -31,6 +34,8 @@ interface RoomCardProps {
   activeConsumptions?: Consumption[];
   onStatusChange: (id: string, status: RoomStatus) => void;
   onOpenControls?: (room: Room) => void;
+  onChangeRoom?: (room: Room) => void;
+  onAddPerson?: (room: Room) => void;
   variant?: 'standard' | 'compact';
 }
 
@@ -39,6 +44,8 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   activeConsumptions = [], 
   onStatusChange, 
   onOpenControls, 
+  onChangeRoom,
+  onAddPerson,
   variant = 'standard' 
 }) => {
   const [showActions, setShowActions] = useState(false);
@@ -112,6 +119,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   // --- COMPACT VIEW (DASHBOARD) ---
   if (variant === 'compact') {
     const isOccupied = room.status === RoomStatus.OCCUPIED;
+    const hasTvControls = (room.tvControlCount || 0) > 0;
+    const hasAcControls = (room.acControlCount || 0) > 0;
+
     return (
       <div 
         onClick={() => {
@@ -130,7 +140,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           )}
         </div>
         
-        <div className="flex-1 flex flex-col justify-center items-center text-center">
+        <div className="flex-1 flex flex-col justify-center items-center text-center relative">
           {isOccupied ? (
             <>
               <p className="text-2xl font-bold">{formatTime(room.checkOutTime)}</p>
@@ -138,6 +148,22 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             </>
           ) : (
             <p className="text-sm font-medium opacity-70">{room.status}</p>
+          )}
+
+          {/* Controls Indicator (Icons) */}
+          {(hasTvControls || hasAcControls) && (
+             <div className="absolute right-0 bottom-0 flex gap-1">
+                {hasTvControls && (
+                  <div className={`p-1 rounded-md ${isOccupied ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'}`} title="Control TV">
+                    <Tv className="w-3 h-3" />
+                  </div>
+                )}
+                {hasAcControls && (
+                  <div className={`p-1 rounded-md ${isOccupied ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'}`} title="Control Aire">
+                    <Thermometer className="w-3 h-3" />
+                  </div>
+                )}
+             </div>
           )}
         </div>
 
@@ -249,11 +275,21 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                     <ActionBtn icon={PlusCircle} label="Aumentar" colorClass="text-green-600 border-green-100 hover:bg-green-50" />
                     <ActionBtn icon={MinusCircle} label="Reducir" colorClass="text-orange-600 border-orange-100 hover:bg-orange-50" />
                     
-                    <ActionBtn icon={UserPlus} label="+/- Persona" colorClass="text-purple-600 border-purple-100 hover:bg-purple-50" />
+                    <ActionBtn 
+                      icon={UserPlus} 
+                      label="+/- Persona" 
+                      colorClass="text-purple-600 border-purple-100 hover:bg-purple-50" 
+                      onClick={() => onAddPerson && onAddPerson(room)}
+                    />
                     <ActionBtn icon={UserMinus} label="Salida Persona" colorClass="text-pink-600 border-pink-100 hover:bg-pink-50" />
                     
                     <ActionBtn icon={Edit} label="Editar E/S" colorClass="text-amber-600 border-amber-100 hover:bg-amber-50" />
-                    <ActionBtn icon={ArrowRightLeft} label="Cambiar Hab." colorClass="text-indigo-600 border-indigo-100 hover:bg-indigo-50" />
+                    <ActionBtn 
+                      icon={ArrowRightLeft} 
+                      label="Cambiar Hab." 
+                      colorClass="text-indigo-600 border-indigo-100 hover:bg-indigo-50"
+                      onClick={() => onChangeRoom && onChangeRoom(room)}
+                    />
                   </div>
                 </div>
               ) : (
@@ -297,6 +333,22 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                        ) : (
                          <p className="opacity-60 italic">Sin datos de vehículo</p>
                        )}
+                    </div>
+                  )}
+
+                  {/* Controls Indicators (Standard View) */}
+                  {((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0) && (
+                    <div className="flex gap-2 pt-1">
+                      {(room.tvControlCount || 0) > 0 && (
+                        <div className="flex items-center gap-1 text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-400/30" title="TV Control">
+                          <Tv className="w-3 h-3" /> <span className="font-mono">{room.tvControlCount}</span>
+                        </div>
+                      )}
+                      {(room.acControlCount || 0) > 0 && (
+                        <div className="flex items-center gap-1 text-[10px] bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-400/30" title="AC Control">
+                          <Thermometer className="w-3 h-3" /> <span className="font-mono">{room.acControlCount}</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
