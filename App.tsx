@@ -87,6 +87,10 @@ export default function App() {
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [selectedRoomForAddPerson, setSelectedRoomForAddPerson] = useState<Room | null>(null);
 
+  // Remove Person Modal State
+  const [removePersonConfirmationOpen, setRemovePersonConfirmationOpen] = useState(false);
+  const [selectedRoomForRemovePerson, setSelectedRoomForRemovePerson] = useState<Room | null>(null);
+
   // Release Confirmation State
   const [releaseConfirmationOpen, setReleaseConfirmationOpen] = useState(false);
   const [selectedRoomForRelease, setSelectedRoomForRelease] = useState<Room | null>(null);
@@ -582,17 +586,27 @@ export default function App() {
   };
 
   // --- REMOVE PERSON LOGIC (No cost reduction) ---
-  const handleRemovePerson = async (room: Room) => {
+  const handleRemovePersonClick = (room: Room) => {
     const currentPeople = room.peopleCount || 2;
     if (currentPeople <= 1) {
       setToast({ message: "Mínimo 1 persona requerida.", type: 'error' });
       return;
     }
+    setSelectedRoomForRemovePerson(room);
+    setRemovePersonConfirmationOpen(true);
+  };
+
+  const confirmRemovePerson = async () => {
+    if (!selectedRoomForRemovePerson) return;
+    const room = selectedRoomForRemovePerson;
+    const currentPeople = room.peopleCount || 2;
     
     // Decrease count but DO NOT change total price
     const newCount = currentPeople - 1;
     
     setRooms(prev => prev.map(r => r.id === room.id ? { ...r, peopleCount: newCount } : r));
+    setRemovePersonConfirmationOpen(false);
+    setSelectedRoomForRemovePerson(null);
 
     const { error } = await supabase.from('rooms').update({
       people_count: newCount
@@ -1166,7 +1180,7 @@ export default function App() {
                   onOpenControls={handleOpenControls}
                   onChangeRoom={handleChangeRoom}
                   onAddPerson={() => handleAddPersonClick(room)}
-                  onRemovePerson={() => handleRemovePerson(room)} // Connect Remove Person handler
+                  onRemovePerson={() => handleRemovePersonClick(room)} // Connect Remove Person handler to the click function that opens modal
                   onAddTime={() => handleOpenAddTime(room)} 
                   onReduceTime={() => handleOpenReduceTime(room)} 
                   onRequestRelease={handleRequestRelease}
@@ -1421,6 +1435,17 @@ export default function App() {
         title="Confirmar Persona Extra"
         message={`¿Está seguro de agregar una persona extra a la Habitación ${selectedRoomForAddPerson?.id}? Se cargará un costo adicional de $150.00.`}
         confirmText="Sí, Agregar (+ $150)"
+        type="warning"
+      />
+
+      {/* REMOVE PERSON CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={removePersonConfirmationOpen}
+        onClose={() => setRemovePersonConfirmationOpen(false)}
+        onConfirm={confirmRemovePerson}
+        title="Confirmar Salida de Persona"
+        message={`¿Está seguro de registrar la salida de una persona de la Habitación ${selectedRoomForRemovePerson?.id}? El costo total de la habitación NO cambiará.`}
+        confirmText="Sí, Registrar Salida"
         type="warning"
       />
 
