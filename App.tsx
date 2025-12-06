@@ -1004,7 +1004,8 @@ const App: React.FC = () => {
       
       case AppView.ROOMS:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">
+          // Adjusted Grid here for smaller cards: sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 animate-fade-in">
              {rooms.map(room => (
                <RoomCard 
                  key={room.id} 

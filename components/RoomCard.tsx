@@ -21,7 +21,6 @@ import {
   UserMinus,
   Edit,
   ArrowRightLeft,
-  ArrowRight,
   Receipt,
   BedDouble,
   ShoppingCart,
@@ -154,21 +153,21 @@ export const RoomCard: React.FC<RoomCardProps> = ({
            if (room.status === RoomStatus.AVAILABLE) onStatusChange(room.id, RoomStatus.OCCUPIED);
            else if (isOccupied) setShowActions(!showActions);
         }}
-        className={`relative p-3 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between h-[140px] cursor-pointer ${getStatusColor(room.status)}`}
+        className={`relative p-2 rounded-lg border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between h-[120px] cursor-pointer ${getStatusColor(room.status)}`}
       >
         {/* Overdue Alarm Compact */}
         {isOverdue && (
-           <div className="absolute -top-2 -right-2 z-20 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse border-2 border-white shadow-sm flex items-center gap-1">
-             <Hourglass className="w-3 h-3" />
+           <div className="absolute -top-2 -right-2 z-20 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full animate-pulse border border-white shadow-sm flex items-center gap-0.5">
+             <Hourglass className="w-2.5 h-2.5" />
              +{overdueMinutes}m
            </div>
         )}
 
         <div className="flex justify-between items-start">
-          <span className="text-lg font-bold leading-none">Hab {room.id}</span>
+          <span className="text-base font-bold leading-none">Hab {room.id}</span>
           {isOccupied && (
-             <div className="flex items-center gap-1 text-[10px] bg-black/10 px-1.5 py-0.5 rounded backdrop-blur-md">
-               <Clock className="w-3 h-3" />
+             <div className="flex items-center gap-0.5 text-[9px] bg-black/10 px-1 py-0.5 rounded backdrop-blur-md">
+               <Clock className="w-2.5 h-2.5" />
                <span>{Math.round(getDurationHours())}h</span>
              </div>
           )}
@@ -177,31 +176,31 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         <div className="flex-1 flex flex-col justify-center items-center text-center relative">
           {isOccupied ? (
             <>
-              <p className={`text-2xl font-bold ${isOverdue ? 'animate-pulse' : ''}`}>{formatTime(room.checkOutTime)}</p>
-              <p className="text-[10px] opacity-90 uppercase tracking-wide mt-1">Salida</p>
+              <p className={`text-xl font-bold ${isOverdue ? 'animate-pulse' : ''}`}>{formatTime(room.checkOutTime)}</p>
+              <p className="text-[9px] opacity-90 uppercase tracking-wide mt-0.5">Salida</p>
             </>
           ) : (
-            <p className="text-sm font-medium opacity-70">{room.status}</p>
+            <p className="text-xs font-medium opacity-70">{room.status}</p>
           )}
 
           {/* Controls Indicator (Icons) */}
           {(hasTvControls || hasAcControls) && (
-             <div className="absolute right-0 bottom-0 flex gap-1">
+             <div className="absolute right-0 bottom-0 flex gap-0.5">
                 {hasTvControls && (
-                  <div className={`p-1 rounded-md ${isOccupied ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'}`} title="Control TV">
-                    <Tv className="w-3 h-3" />
+                  <div className={`p-0.5 rounded ${isOccupied ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'}`} title="Control TV">
+                    <Tv className="w-2.5 h-2.5" />
                   </div>
                 )}
                 {hasAcControls && (
-                  <div className={`p-1 rounded-md ${isOccupied ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'}`} title="Control Aire">
-                    <Thermometer className="w-3 h-3" />
+                  <div className={`p-0.5 rounded ${isOccupied ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'}`} title="Control Aire">
+                    <Thermometer className="w-2.5 h-2.5" />
                   </div>
                 )}
              </div>
           )}
         </div>
 
-        <div className="flex justify-between items-end text-[10px] font-medium opacity-80">
+        <div className="flex justify-between items-end text-[9px] font-medium opacity-80">
           <span>{room.type}</span>
           {isOccupied && <span>{room.peopleCount} Pers.</span>}
         </div>
@@ -209,62 +208,62 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     );
   }
 
-  // --- STANDARD VIEW (ROOMS SCREEN) ---
+  // --- STANDARD VIEW (ROOMS SCREEN) - COMPACTED ---
   const ActionBtn = ({ icon: Icon, label, colorClass, onClick }: { icon: any, label: string, colorClass: string, onClick?: () => void }) => (
     <button 
       onClick={onClick}
-      className={`flex flex-col items-center justify-center p-2 rounded-lg border bg-white shadow-sm hover:shadow-md transition active:scale-95 ${colorClass}`}
+      className={`flex flex-col items-center justify-center p-1 rounded-lg border bg-white shadow-sm hover:shadow-md transition active:scale-95 ${colorClass}`}
     >
-      <Icon className="w-5 h-5 mb-1" />
-      <span className="text-[10px] font-bold text-center leading-tight">{label}</span>
+      <Icon className="w-3.5 h-3.5 mb-0.5" />
+      <span className="text-[8px] font-bold text-center leading-tight">{label}</span>
     </button>
   );
 
   return (
-    <div className={`relative p-5 rounded-2xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between min-h-[380px] ${getStatusColor(room.status)}`}>
+    <div className={`relative p-2.5 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between min-h-[260px] ${getStatusColor(room.status)}`}>
       
       {/* Overdue Alarm Standard */}
       {isOverdue && (
-         <div className="absolute -top-3 -right-3 z-20 bg-red-600 text-white px-3 py-1.5 rounded-full font-bold shadow-lg animate-pulse border-2 border-white flex items-center gap-1.5">
-           <AlertTriangle className="w-4 h-4" />
-           VENCIDA +{overdueMinutes}m
+         <div className="absolute -top-2 -right-2 z-20 bg-red-600 text-white px-2 py-0.5 rounded-full font-bold shadow-lg animate-pulse border-2 border-white flex items-center gap-1">
+           <AlertTriangle className="w-3 h-3" />
+           <span className="text-[9px]">+{overdueMinutes}m</span>
          </div>
       )}
 
       {/* Header */}
       <div>
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-center mb-1.5">
           <div>
-            <h3 className="text-xl font-bold">Habitación {room.id}</h3>
-            <p className="text-xs opacity-75 mt-1 font-medium tracking-wide">{room.type.toUpperCase()}</p>
+            <h3 className="text-base font-bold">Habitación {room.id}</h3>
+            <p className="text-[9px] opacity-75 font-medium tracking-wide">{room.type.toUpperCase()}</p>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadge(room.status)}`}>
+          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getStatusBadge(room.status)}`}>
             {room.status}
           </span>
         </div>
 
         {/* Content Area */}
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           
           {room.status === RoomStatus.OCCUPIED && (
             <>
               {showActions ? (
                 // EXPANDED MENU VIEW
-                <div className="animate-fade-in space-y-3 text-slate-800">
+                <div className="animate-fade-in space-y-1.5 text-slate-800">
                   {/* Detailed History Log Box (Financial Breakdown) */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-inner overflow-hidden">
-                    <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                       <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                         <Receipt className="w-3 h-3" /> Estado de Cuenta
+                  <div className="bg-white rounded-lg border border-slate-200 shadow-inner overflow-hidden">
+                    <div className="px-2 py-1 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                       <span className="text-[9px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                         <Receipt className="w-3 h-3" /> Cuenta
                        </span>
-                       <span className="text-[10px] text-slate-400 font-mono">{formatDate(room.checkInTime)}</span>
+                       <span className="text-[8px] text-slate-400 font-mono">{formatDate(room.checkInTime)}</span>
                     </div>
                     
-                    <div className="p-3 max-h-[120px] overflow-y-auto custom-scrollbar space-y-2">
+                    <div className="p-1.5 max-h-[80px] overflow-y-auto custom-scrollbar space-y-0.5">
                       {/* Room Rent Line */}
-                      <div className="flex justify-between items-center text-xs text-slate-700">
-                         <div className="flex items-center gap-2">
-                           <BedDouble className="w-3.5 h-3.5 text-blue-500" />
+                      <div className="flex justify-between items-center text-[9px] text-slate-700">
+                         <div className="flex items-center gap-1">
+                           <BedDouble className="w-2.5 h-2.5 text-blue-500" />
                            <span className="font-medium">Hospedaje ({Math.round(getDurationHours())}h)</span>
                          </div>
                          <span className="font-mono font-bold">${roomRentPrice.toFixed(2)}</span>
@@ -272,10 +271,10 @@ export const RoomCard: React.FC<RoomCardProps> = ({
 
                       {/* Extra Person Line */}
                       {extraPeople > 0 && (
-                        <div className="flex justify-between items-center text-xs text-slate-700">
-                           <div className="flex items-center gap-2">
-                             <UserPlus className="w-3.5 h-3.5 text-purple-500" />
-                             <span className="font-medium">Persona Extra ({extraPeople})</span>
+                        <div className="flex justify-between items-center text-[9px] text-slate-700">
+                           <div className="flex items-center gap-1">
+                             <UserPlus className="w-2.5 h-2.5 text-purple-500" />
+                             <span className="font-medium">Extra ({extraPeople})</span>
                            </div>
                            <span className="font-mono font-bold">${extraPersonCost.toFixed(2)}</span>
                         </div>
@@ -283,11 +282,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
 
                       {/* Items List */}
                       {allItems.length > 0 && (
-                        <div className="pt-2 mt-1 border-t border-slate-100 space-y-1.5">
+                        <div className="pt-0.5 mt-0.5 border-t border-slate-100 space-y-0.5">
                           {allItems.map((item, idx) => (
-                            <div key={`${item.productId}-${idx}`} className="flex justify-between items-center text-xs text-slate-600">
-                              <div className="flex items-center gap-2">
-                                <ShoppingCart className="w-3 h-3 text-rose-500" />
+                            <div key={`${item.productId}-${idx}`} className="flex justify-between items-center text-[9px] text-slate-600">
+                              <div className="flex items-center gap-1">
+                                <ShoppingCart className="w-2.5 h-2.5 text-rose-500" />
                                 <span>{item.quantity}x {item.productName}</span>
                               </div>
                               <span className="font-mono">${item.total.toFixed(2)}</span>
@@ -298,17 +297,17 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                     </div>
 
                     {/* Total Footer */}
-                    <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                       <span className="text-xs font-bold text-slate-600 uppercase">Total a Pagar</span>
-                       <div className="flex items-center gap-1 bg-green-100 px-2 py-0.5 rounded text-green-700">
-                          <DollarSign className="w-3.5 h-3.5" />
-                          <span className="font-bold font-mono">{totalRoomPrice.toFixed(2)}</span>
+                    <div className="px-2 py-0.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                       <span className="text-[9px] font-bold text-slate-600 uppercase">Total</span>
+                       <div className="flex items-center gap-1 bg-green-100 px-1.5 py-0.5 rounded text-green-700">
+                          <DollarSign className="w-2.5 h-2.5" />
+                          <span className="font-bold font-mono text-[10px]">{totalRoomPrice.toFixed(2)}</span>
                        </div>
                     </div>
                   </div>
 
                   {/* Actions Grid */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1">
                     <ActionBtn 
                       icon={LogOut} 
                       label="Liberar" 
@@ -343,10 +342,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                       onClick={() => onAddPerson && onAddPerson(room)}
                     />
                     
-                    {/* Updated ActionBtn for Remove Person */}
                     <ActionBtn 
                       icon={UserMinus} 
-                      label="Salida Persona" 
+                      label="Salida Pers." 
                       colorClass="text-pink-600 border-pink-100 hover:bg-pink-50" 
                       onClick={() => onRemovePerson && onRemovePerson(room)}
                     />
@@ -362,24 +360,24 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                 </div>
               ) : (
                 // STANDARD INFO VIEW
-                <div className="space-y-3 bg-white/20 p-3 rounded-xl border border-white/30 backdrop-blur-sm text-current">
+                <div className="space-y-1.5 bg-white/20 p-2 rounded-lg border border-white/30 backdrop-blur-sm text-current">
                   
                   {/* Client & People */}
-                  <div className="flex justify-between items-start border-b border-white/20 pb-2">
-                     <div className="flex items-center gap-2 font-semibold">
-                        <User className="w-4 h-4 opacity-80" />
-                        <span className="truncate max-w-[110px] text-sm" title={room.clientName}>{room.clientName || 'Anónimo'}</span>
+                  <div className="flex justify-between items-start border-b border-white/20 pb-1">
+                     <div className="flex items-center gap-1 font-semibold">
+                        <User className="w-3 h-3 opacity-80" />
+                        <span className="truncate max-w-[80px] text-[10px]" title={room.clientName}>{room.clientName || 'Anónimo'}</span>
                      </div>
-                     <div className="flex items-center gap-1 text-xs bg-black/10 px-2 py-1 rounded-md border border-white/10 shadow-sm">
-                        <Users className="w-3 h-3" />
+                     <div className="flex items-center gap-0.5 text-[9px] bg-black/10 px-1 py-0.5 rounded-md border border-white/10 shadow-sm">
+                        <Users className="w-2.5 h-2.5" />
                         <span>{room.peopleCount || 2}</span>
                      </div>
                   </div>
 
                   {/* Time Range */}
-                  <div className={`flex items-center gap-2 text-xs bg-black/10 p-2 rounded-lg ${isOverdue ? 'ring-2 ring-red-500 animate-pulse' : ''}`}>
-                    <Clock className="w-3.5 h-3.5 opacity-70" />
-                    <div className="flex gap-2 font-mono font-medium">
+                  <div className={`flex items-center gap-1.5 text-[9px] bg-black/10 p-1 rounded-lg ${isOverdue ? 'ring-2 ring-red-500 animate-pulse' : ''}`}>
+                    <Clock className="w-2.5 h-2.5 opacity-70" />
+                    <div className="flex gap-1.5 font-mono font-medium">
                       <span>{formatTime(room.checkInTime)}</span>
                       <span className="opacity-50">➜</span>
                       <span>{formatTime(room.checkOutTime)}</span>
@@ -388,44 +386,44 @@ export const RoomCard: React.FC<RoomCardProps> = ({
 
                   {/* Vehicle Details */}
                   {room.entryType !== 'Pie' && (
-                    <div className="text-xs space-y-1 pl-2 border-l-2 border-white/30">
-                       <div className="flex items-center gap-1.5 font-medium opacity-90">
+                    <div className="text-[9px] space-y-0.5 pl-1.5 border-l-2 border-white/30">
+                       <div className="flex items-center gap-1 font-medium opacity-90">
                          {getEntryIcon(room.entryType)}
                          <span>{room.entryType}</span>
                        </div>
                        {(room.vehicleBrand || room.vehiclePlate) ? (
                           <div className="space-y-0.5 opacity-80">
-                            <p className="truncate">{room.vehicleBrand} {room.vehicleModel} {room.vehicleColor}</p>
-                            <p className="font-mono font-bold inline-block px-1 rounded text-[10px] bg-black/10">{room.vehiclePlate}</p>
+                            <p className="truncate max-w-[100px]">{room.vehicleBrand} {room.vehicleModel}</p>
+                            <p className="font-mono font-bold inline-block px-1 rounded text-[8px] bg-black/10">{room.vehiclePlate}</p>
                           </div>
                        ) : (
-                         <p className="opacity-60 italic">Sin datos de vehículo</p>
+                         <p className="opacity-60 italic text-[8px]">Sin datos</p>
                        )}
                     </div>
                   )}
 
                   {/* Controls Indicators */}
                   {((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0) && (
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-1 pt-0.5">
                       {(room.tvControlCount || 0) > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-400/30" title="TV Control">
-                          <Tv className="w-3 h-3" /> <span className="font-mono">{room.tvControlCount}</span>
+                        <div className="flex items-center gap-0.5 text-[8px] bg-blue-500/20 px-1 py-0.5 rounded border border-blue-400/30" title="TV Control">
+                          <Tv className="w-2.5 h-2.5" /> <span className="font-mono">{room.tvControlCount}</span>
                         </div>
                       )}
                       {(room.acControlCount || 0) > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] bg-orange-500/20 px-1.5 py-0.5 rounded border border-orange-400/30" title="AC Control">
-                          <Thermometer className="w-3 h-3" /> <span className="font-mono">{room.acControlCount}</span>
+                        <div className="flex items-center gap-0.5 text-[8px] bg-orange-500/20 px-1 py-0.5 rounded border border-orange-400/30" title="AC Control">
+                          <Thermometer className="w-2.5 h-2.5" /> <span className="font-mono">{room.acControlCount}</span>
                         </div>
                       )}
                     </div>
                   )}
 
                   {/* Price */}
-                  <div className="pt-1 flex justify-between items-center">
-                    <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">Total</span>
-                    <div className="flex items-center font-bold bg-black/10 px-2 py-1 rounded-md border border-white/10">
-                      <DollarSign className="w-3.5 h-3.5" />
-                      <span>{room.totalPrice || 0}</span>
+                  <div className="pt-0.5 flex justify-between items-center">
+                    <span className="text-[8px] font-bold opacity-70 uppercase tracking-widest">Total</span>
+                    <div className="flex items-center font-bold bg-black/10 px-1.5 py-0.5 rounded-md border border-white/10">
+                      <DollarSign className="w-3 h-3" />
+                      <span className="text-xs">{room.totalPrice || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -434,33 +432,33 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           )}
           
           {room.status === RoomStatus.AVAILABLE && (
-            <div className="flex items-center text-sm gap-2 opacity-60 py-4">
+            <div className="flex items-center text-xs gap-2 opacity-60 py-4 justify-center">
               <Sparkles className="w-4 h-4" />
-              <span>Lista para recibir huéspedes</span>
+              <span>Lista</span>
             </div>
           )}
 
           {room.status === RoomStatus.MAINTENANCE && (
-            <div className="flex items-center text-sm gap-2 opacity-60 py-4">
+            <div className="flex items-center text-xs gap-2 opacity-60 py-4 justify-center">
               <AlertTriangle className="w-4 h-4" />
-              <span>Revisión técnica requerida</span>
+              <span>Mantenimiento</span>
             </div>
           )}
           
            {room.status === RoomStatus.CLEANING && (
-            <div className="flex items-center text-sm gap-2 opacity-60 py-4">
+            <div className="flex items-center text-xs gap-2 opacity-60 py-4 justify-center">
               <Sparkles className="w-4 h-4" />
-              <span>Limpieza en progreso</span>
+              <span>Limpieza</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className={`mt-4 pt-4 border-t ${room.status === RoomStatus.OCCUPIED ? 'border-white/20' : 'border-black/5'}`}>
+      <div className={`mt-1.5 pt-1.5 border-t ${room.status === RoomStatus.OCCUPIED ? 'border-white/20' : 'border-black/5'}`}>
         {room.status === RoomStatus.OCCUPIED ? (
           <button 
             onClick={() => setShowActions(!showActions)}
-            className={`w-full py-2.5 rounded-lg text-sm font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-2 ${
+            className={`w-full py-1.5 rounded-lg text-xs font-bold transition shadow-sm hover:shadow-md flex items-center justify-center gap-1 ${
               showActions 
                 ? 'bg-white text-slate-700 hover:bg-slate-50' 
                 : 'bg-black/20 text-white hover:bg-black/30'
@@ -468,20 +466,20 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           >
             {showActions ? (
               <>
-                <X className="w-4 h-4" /> Cerrar Menú
+                <X className="w-3 h-3" /> Cerrar
               </>
             ) : (
               <>
-                <Menu className="w-4 h-4" /> Gestionar
+                <Menu className="w-3 h-3" /> Gestionar
               </>
             )}
           </button>
         ) : (
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {room.status === RoomStatus.AVAILABLE && (
               <button 
                 onClick={() => onStatusChange(room.id, RoomStatus.OCCUPIED)}
-                className="w-full py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition shadow-sm hover:shadow-md"
+                className="w-full py-1.5 bg-rose-600 text-white rounded-lg text-xs font-medium hover:bg-rose-700 transition shadow-sm hover:shadow-md"
               >
                 Ocupar
               </button>
@@ -489,17 +487,17 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             {room.status === RoomStatus.CLEANING && (
               <button 
                 onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
-                className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition shadow-sm hover:shadow-md"
+                className="w-full py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition shadow-sm hover:shadow-md"
               >
-                Marcar Lista
+                Lista
               </button>
             )}
             {(room.status === RoomStatus.MAINTENANCE) && (
               <button 
                 onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
-                className="w-full py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 transition shadow-sm hover:shadow-md"
+                className="w-full py-1.5 bg-yellow-600 text-white rounded-lg text-xs font-medium hover:bg-yellow-700 transition shadow-sm hover:shadow-md"
               >
-                Finalizar Mant.
+                Listo
               </button>
             )}
           </div>
