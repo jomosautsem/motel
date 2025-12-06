@@ -121,6 +121,7 @@ export default function App() {
            return a.id.localeCompare(b.id);
         }).map((r: any) => ({
           ...r,
+          type: 'Sencilla', // Override type to 'Sencilla' for all rooms
           checkInTime: r.check_in_time ? new Date(r.check_in_time) : undefined,
           checkOutTime: r.check_out_time ? new Date(r.check_out_time) : undefined,
           peopleCount: r.people_count,

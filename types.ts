@@ -9,7 +9,7 @@ export enum RoomStatus {
 export interface Room {
   id: string;
   status: RoomStatus;
-  type: 'Suite' | 'Jacuzzi' | 'Sencilla';
+  type: 'Sencilla';
   
   // Occupancy Details
   checkInTime?: Date;
