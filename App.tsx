@@ -33,7 +33,7 @@ import { ExpensesManager } from './components/ExpensesManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry } from './types';
+import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry, VehicleLog } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
 
@@ -59,6 +59,7 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [expensesList, setExpensesList] = useState<Expense[]>([]);
   const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
+  const [vehicleHistory, setVehicleHistory] = useState<VehicleLog[]>([]);
 
   const [foodModalOpen, setFoodModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -164,6 +165,22 @@ export default function App() {
       if (repData) {
         setVehicleReports(repData.map((r: any) => ({ ...r, date: new Date(r.date) })));
       }
+      
+      // Fetch Vehicle History
+      const { data: vHistData } = await supabase.from('vehicle_history').select('*').order('entry_time', { ascending: false });
+      if (vHistData) {
+        setVehicleHistory(vHistData.map((v: any) => ({
+          id: v.id,
+          roomId: v.room_id,
+          plate: v.plate,
+          brand: v.brand,
+          model: v.model,
+          color: v.color,
+          entryType: v.entry_type,
+          entryTime: new Date(v.entry_time),
+          exitTime: v.exit_time ? new Date(v.exit_time) : undefined
+        })));
+      }
 
       const { data: consData } = await supabase
         .from('consumptions')
@@ -266,6 +283,7 @@ export default function App() {
       }
 
       if (room && room.status === RoomStatus.OCCUPIED) {
+         // --- HISTORIAL DE RENTAS ---
          const roomConsumptions = consumptions
            .filter(c => c.roomId === roomId && c.status === 'Pendiente en Habitación')
            .reduce((acc, c) => acc + c.totalAmount, 0);
@@ -283,6 +301,14 @@ export default function App() {
            .update({ status: 'Pagado' })
            .eq('room_id', roomId)
            .eq('status', 'Pendiente en Habitación');
+
+         // --- HISTORIAL DE VEHÍCULOS (Cierre) ---
+         if (room.entryType === 'Auto' || room.entryType === 'Moto') {
+           await supabase.from('vehicle_history')
+             .update({ exit_time: new Date() })
+             .eq('room_id', roomId)
+             .is('exit_time', null); // Close only active session
+         }
       }
     }
 
@@ -311,7 +337,6 @@ export default function App() {
       setToast({ message: "Error actualizando habitación", type: "error" });
       fetchData();
     } else {
-      // Refresh data to get the new history entry immediately
       if (newStatus === RoomStatus.CLEANING) {
         fetchData(); 
       }
@@ -341,7 +366,6 @@ export default function App() {
       ));
       
       setOccupancyModalOpen(false);
-      setSelectedRoomForOccupancy(null);
 
       const { error } = await supabase
         .from('rooms')
@@ -352,6 +376,21 @@ export default function App() {
         console.error(error);
         setToast({ message: "Error al guardar ocupación", type: 'error' });
         fetchData();
+      } else {
+        // --- GUARDAR EN HISTORIAL DE VEHÍCULOS ---
+        if (data.entryType !== 'Pie') {
+           await supabase.from('vehicle_history').insert({
+             room_id: selectedRoomForOccupancy.id,
+             plate: data.vehiclePlate,
+             brand: data.vehicleBrand,
+             model: data.vehicleModel,
+             color: data.vehicleColor,
+             entry_type: data.entryType,
+             entry_time: data.checkInTime
+           });
+           fetchData(); // Refresh to get the new vehicle history
+        }
+        setSelectedRoomForOccupancy(null);
       }
     }
   };
@@ -431,6 +470,12 @@ export default function App() {
       }).eq('id', sourceId);
 
       if (sourceError) throw sourceError;
+      
+      // Update vehicle history with new room ID
+      await supabase.from('vehicle_history')
+        .update({ room_id: targetId })
+        .eq('room_id', sourceId)
+        .is('exit_time', null);
 
       setToast({ message: `Cambio de Habitación ${sourceId} a ${targetId} exitoso.`, type: 'success' });
       setChangeRoomModalOpen(false);
@@ -655,7 +700,6 @@ export default function App() {
     r.checkInTime && r.checkInTime >= shiftStartTime
   );
   
-  // -- NEW: HISTORY FILTERING --
   const shiftHistory = roomHistory.filter(h => h.createdAt >= shiftStartTime);
   const historyRevenue = shiftHistory.reduce((acc, h) => acc + h.totalPrice, 0);
 
@@ -664,16 +708,13 @@ export default function App() {
     return r.status === RoomStatus.OCCUPIED ? acc + (r.peopleCount || 0) : acc;
   }, 0);
   
-  // Calculate ACTIVE revenue (currently occupied)
   const grossRoomTotal = shiftOccupiedRooms.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
   const activeConsumptionsTotal = shiftConsumptions
     .filter(c => c.status === 'Pendiente en Habitación' && c.roomId)
     .reduce((acc, c) => acc + c.totalAmount, 0);
 
-  // activeRent = Total Price on Room - Active Consumptions on Room
   const activeRoomRentRevenue = Math.max(0, grossRoomTotal - activeConsumptionsTotal);
   
-  // TOTAL ROOM REVENUE = Active Rents + Finished (History) Rents
   const roomRevenue = activeRoomRentRevenue + historyRevenue;
   
   const productRevenue = shiftConsumptions
@@ -976,6 +1017,7 @@ export default function App() {
               rooms={rooms}
               reports={vehicleReports}
               onAddReport={handleAddVehicleReport}
+              vehicleHistory={vehicleHistory}
             />
           )}
 

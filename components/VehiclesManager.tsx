@@ -1,17 +1,19 @@
 
 import React, { useState } from 'react';
-import { Room, RoomStatus, VehicleReport } from '../types';
-import { Car, Bike, Footprints, AlertTriangle, PlusCircle, Search, User, MapPin, Clock } from 'lucide-react';
+import { Room, RoomStatus, VehicleReport, VehicleLog } from '../types';
+import { Car, Bike, Footprints, AlertTriangle, PlusCircle, Search, User, MapPin, Clock, History, Calendar } from 'lucide-react';
 import { VehicleReportModal } from './VehicleReportModal';
 
 interface VehiclesManagerProps {
   rooms: Room[];
   reports: VehicleReport[];
   onAddReport: (report: Omit<VehicleReport, 'id' | 'date'>) => void;
+  vehicleHistory?: VehicleLog[];
 }
 
-export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports, onAddReport }) => {
+export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports, onAddReport, vehicleHistory = [] }) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
   // Stats
   const occupiedRooms = rooms.filter(r => r.status === RoomStatus.OCCUPIED);
@@ -126,77 +128,156 @@ export const VehiclesManager: React.FC<VehiclesManagerProps> = ({ rooms, reports
         )}
       </div>
 
-      {/* Active Vehicles List */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-           <div className="flex items-center gap-2 text-slate-800">
-            <Car className="w-5 h-5 text-blue-500" />
-            <h3 className="text-lg font-bold">Vehículos en Propiedad</h3>
-          </div>
-          <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full">
-            {occupiedRooms.length} Activos
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {occupiedRooms.map(room => (
-            <div key={room.id} className="p-5 rounded-2xl border border-slate-100 hover:shadow-md transition bg-white group">
-              
-              <div className="flex justify-between items-start mb-4">
-                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition">
-                      {room.entryType === 'Moto' ? <Bike className="w-5 h-5" /> : room.entryType === 'Pie' ? <User className="w-5 h-5" /> : <Car className="w-5 h-5" />}
-                   </div>
-                   <div>
-                     <p className="text-xs text-slate-400 font-bold uppercase">Cliente</p>
-                     <p className="font-bold text-slate-800">Habitación {room.id}</p>
-                   </div>
-                 </div>
-                 <span className="text-[10px] font-bold bg-green-100 text-green-600 px-2 py-1 rounded-md">
-                   Activo
-                 </span>
-              </div>
-
-              {room.entryType !== 'Pie' ? (
-                <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">Placa:</span>
-                    <span className="text-xs font-mono font-bold text-slate-800">{room.vehiclePlate || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">Vehículo:</span>
-                    <span className="text-xs font-medium text-slate-800 text-right truncate max-w-[120px]">
-                      {room.vehicleBrand} {room.vehicleModel}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">Color:</span>
-                    <span className="text-xs font-medium text-slate-800">{room.vehicleColor || 'N/A'}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 text-sm gap-2 h-[86px]">
-                  <Footprints className="w-4 h-4" /> Entrada a Pie
-                </div>
-              )}
-
-              <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
-                <MapPin className="w-3 h-3" />
-                <span>Habitación {room.id}</span>
-                <span className="mx-1">•</span>
-                <Clock className="w-3 h-3" />
-                <span>{room.checkInTime ? room.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</span>
-              </div>
-
-            </div>
-          ))}
-          {occupiedRooms.length === 0 && (
-            <div className="col-span-full py-8 text-center text-slate-400 italic">
-              No hay habitaciones ocupadas actualmente.
-            </div>
-          )}
-        </div>
+      {/* Vehicles Tabs */}
+      <div className="flex gap-4 border-b border-slate-200">
+        <button 
+          onClick={() => setActiveTab('active')}
+          className={`pb-3 px-2 font-semibold text-sm transition ${activeTab === 'active' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Vehículos Activos ({occupiedRooms.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('history')}
+          className={`pb-3 px-2 font-semibold text-sm transition ${activeTab === 'history' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Historial de Accesos
+        </button>
       </div>
+
+      {activeTab === 'active' ? (
+        // ACTIVE VEHICLES GRID
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+             <div className="flex items-center gap-2 text-slate-800">
+              <Car className="w-5 h-5 text-blue-500" />
+              <h3 className="text-lg font-bold">Vehículos en Propiedad</h3>
+            </div>
+            <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              {occupiedRooms.length} Activos
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {occupiedRooms.map(room => (
+              <div key={room.id} className="p-5 rounded-2xl border border-slate-100 hover:shadow-md transition bg-white group">
+                
+                <div className="flex justify-between items-start mb-4">
+                   <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600 transition">
+                        {room.entryType === 'Moto' ? <Bike className="w-5 h-5" /> : room.entryType === 'Pie' ? <User className="w-5 h-5" /> : <Car className="w-5 h-5" />}
+                     </div>
+                     <div>
+                       <p className="text-xs text-slate-400 font-bold uppercase">Cliente</p>
+                       <p className="font-bold text-slate-800">Habitación {room.id}</p>
+                     </div>
+                   </div>
+                   <span className="text-[10px] font-bold bg-green-100 text-green-600 px-2 py-1 rounded-md">
+                     Activo
+                   </span>
+                </div>
+
+                {room.entryType !== 'Pie' ? (
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div className="flex justify-between">
+                      <span className="text-xs text-slate-500">Placa:</span>
+                      <span className="text-xs font-mono font-bold text-slate-800">{room.vehiclePlate || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-slate-500">Vehículo:</span>
+                      <span className="text-xs font-medium text-slate-800 text-right truncate max-w-[120px]">
+                        {room.vehicleBrand} {room.vehicleModel}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-slate-500">Color:</span>
+                      <span className="text-xs font-medium text-slate-800">{room.vehicleColor || 'N/A'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 text-sm gap-2 h-[86px]">
+                    <Footprints className="w-4 h-4" /> Entrada a Pie
+                  </div>
+                )}
+
+                <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                  <MapPin className="w-3 h-3" />
+                  <span>Habitación {room.id}</span>
+                  <span className="mx-1">•</span>
+                  <Clock className="w-3 h-3" />
+                  <span>{room.checkInTime ? room.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</span>
+                </div>
+
+              </div>
+            ))}
+            {occupiedRooms.length === 0 && (
+              <div className="col-span-full py-8 text-center text-slate-400 italic">
+                No hay habitaciones ocupadas actualmente.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        // HISTORY LIST
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm">
+           <div className="flex items-center gap-2 mb-6 text-slate-800">
+            <History className="w-5 h-5 text-purple-500" />
+            <h3 className="text-lg font-bold">Registro Histórico de Vehículos</h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400">
+                <tr>
+                  <th className="px-4 py-3 rounded-l-xl">Fecha/Hora</th>
+                  <th className="px-4 py-3">Habitación</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Placa</th>
+                  <th className="px-4 py-3">Vehículo</th>
+                  <th className="px-4 py-3 rounded-r-xl text-right">Duración</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {vehicleHistory.length === 0 ? (
+                   <tr>
+                     <td colSpan={6} className="text-center py-8 text-slate-400 italic">No hay historial registrado.</td>
+                   </tr>
+                ) : (
+                   vehicleHistory.map(log => {
+                      const duration = log.exitTime 
+                        ? ((log.exitTime.getTime() - log.entryTime.getTime()) / (1000 * 60 * 60)).toFixed(1) + ' hrs'
+                        : 'En curso';
+
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50 transition">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span className="font-medium text-slate-700">{log.entryTime.toLocaleDateString()}</span>
+                              <span className="text-xs text-slate-400">{log.entryTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-800">Hab {log.roomId}</td>
+                          <td className="px-4 py-3">
+                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.entryType === 'Auto' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                               {log.entryType}
+                             </span>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold">{log.plate || '-'}</td>
+                          <td className="px-4 py-3 text-slate-500">{log.brand} {log.model} {log.color && `(${log.color})`}</td>
+                          <td className="px-4 py-3 text-right">
+                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${!log.exitTime ? 'bg-green-100 text-green-700' : 'text-slate-500'}`}>
+                               {duration}
+                             </span>
+                          </td>
+                        </tr>
+                      );
+                   })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <VehicleReportModal 
         isOpen={modalOpen}

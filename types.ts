@@ -96,3 +96,15 @@ export interface VehicleReport {
   date: Date;
   severity: 'Baja' | 'Media' | 'Alta';
 }
+
+export interface VehicleLog {
+  id: string;
+  roomId: string;
+  plate: string;
+  brand: string;
+  model: string;
+  color: string;
+  entryType: 'Auto' | 'Moto';
+  entryTime: Date;
+  exitTime?: Date;
+}
