@@ -1164,8 +1164,17 @@ const App: React.FC = () => {
       
       {/* Sidebar */}
       <div className="w-20 lg:w-64 bg-slate-900 text-white flex flex-col shrink-0 transition-all duration-300">
-        <div className="p-6 flex items-center gap-3 font-bold text-xl text-rose-500">
-           <BedDouble className="w-8 h-8" />
+        <div className="p-6 flex items-center gap-3 font-bold text-xl text-emerald-500">
+           <img 
+             src="/logo.png" 
+             alt="Logo" 
+             className="w-12 h-12 rounded-full border-2 border-emerald-600 shadow-md object-cover bg-slate-800"
+             onError={(e) => {
+               e.currentTarget.style.display = 'none';
+               e.currentTarget.nextElementSibling?.classList.remove('hidden');
+             }}
+           />
+           <BedDouble className="w-8 h-8 hidden" />
            <span className="hidden lg:block">Motel Las Bolas</span>
         </div>
         
