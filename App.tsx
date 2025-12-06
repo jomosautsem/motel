@@ -113,14 +113,17 @@ const App: React.FC = () => {
   const initSystem = async () => {
     try {
       // 1. AUTO-LOGIN (Fixes "No rooms visible" issue due to RLS)
-      // This is crucial. If this fails or is missing, Supabase returns empty arrays.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        // Automatically login as admin to ensure RLS policies allow reading data
         const { error: authError } = await supabase.auth.signInWithPassword({
           email: 'motellasbolas@gmail.com',
           password: 'j5s82QSM'
         });
-        if (authError) console.error("Auth Error:", authError);
+        if (authError) {
+            console.error("Auth Error (Auto-Login Failed):", authError);
+            showToast("Error de autenticación. Recargue la página.", "error");
+        }
       }
 
       await fetchData();
@@ -725,6 +728,7 @@ const App: React.FC = () => {
   };
 
   const handleAddVehicleReport = async (reportData: any) => {
+    // Attempt to save full data first
     const { error } = await supabase.from('vehicle_reports').insert({
         plate: reportData.plate,
         brand: reportData.brand,
@@ -733,8 +737,25 @@ const App: React.FC = () => {
         severity: reportData.severity,
         date: new Date()
     });
-    if (error) showToast("Error creando reporte", "error");
-    else {
+
+    if (error) {
+        // Fallback: If 'brand' column doesn't exist yet, save basic report
+        if (error.code === '42703') { // Undefined column
+             const { error: retryError } = await supabase.from('vehicle_reports').insert({
+                plate: reportData.plate,
+                description: reportData.description,
+                severity: reportData.severity,
+                date: new Date()
+            });
+            if (retryError) showToast("Error creando reporte", "error");
+            else {
+                await fetchData();
+                showToast('Reporte vehicular creado (Sin detalles de marca)', 'warning');
+            }
+        } else {
+            showToast("Error creando reporte", "error");
+        }
+    } else {
         await fetchData();
         showToast('Reporte vehicular creado', 'warning');
     }
