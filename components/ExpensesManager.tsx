@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Expense } from '../types';
 import { PlusCircle, TrendingDown, Trash2, DollarSign, Wallet, Calendar } from 'lucide-react';
+import { PasswordModal } from './PasswordModal';
 
 interface ExpensesManagerProps {
   expenses: Expense[];
@@ -13,6 +14,10 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, onAd
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
 
+  // Password Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [expenseIdToDelete, setExpenseIdToDelete] = useState<string | null>(null);
+
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -22,6 +27,18 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, onAd
     onAddExpense(description, parseFloat(amount));
     setDescription('');
     setAmount('');
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setExpenseIdToDelete(id);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (expenseIdToDelete) {
+      onDeleteExpense(expenseIdToDelete);
+      setExpenseIdToDelete(null);
+    }
   };
 
   return (
@@ -140,7 +157,7 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, onAd
                         -${expense.amount.toFixed(2)}
                       </span>
                       <button 
-                        onClick={() => onDeleteExpense(expense.id)}
+                        onClick={() => handleDeleteClick(expense.id)}
                         className="p-2 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition opacity-0 group-hover:opacity-100"
                         title="Eliminar Gasto"
                       >
@@ -156,6 +173,15 @@ export const ExpensesManager: React.FC<ExpensesManagerProps> = ({ expenses, onAd
         </div>
 
       </div>
+
+      <PasswordModal 
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        requiredPassword="gastosj5s82QSM"
+        title="Eliminar Gasto"
+        message="Esta acción es irreversible. Ingrese contraseña para confirmar."
+      />
     </div>
   );
 };
