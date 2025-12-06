@@ -109,3 +109,16 @@ export interface VehicleLog {
   entryTime: Date;
   exitTime?: Date;
 }
+
+export interface CashCut {
+  id: string;
+  shiftName: string;
+  openingTime: Date;
+  closingTime?: Date;
+  initialAmount: number;
+  finalDeclaredAmount?: number;
+  systemExpectedAmount?: number;
+  difference?: number;
+  status: 'open' | 'closed';
+  notes?: string;
+}

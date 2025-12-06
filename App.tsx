@@ -21,7 +21,9 @@ import {
   Package,
   Receipt,
   Coffee,
-  CalendarClock
+  CalendarClock,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { RoomCard } from './components/RoomCard';
 import { OccupancyModal } from './components/OccupancyModal';
@@ -36,8 +38,11 @@ import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { AddTimeModal } from './components/AddTimeModal';
-import { ReduceTimeModal } from './components/ReduceTimeModal'; // Import ReduceTimeModal
-import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry, VehicleLog } from './types';
+import { ReduceTimeModal } from './components/ReduceTimeModal';
+import { CashOpeningModal } from './components/CashOpeningModal';
+import { CashClosingModal } from './components/CashClosingModal';
+
+import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry, VehicleLog, CashCut } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
 
@@ -64,6 +69,11 @@ export default function App() {
   const [expensesList, setExpensesList] = useState<Expense[]>([]);
   const [roomHistory, setRoomHistory] = useState<RoomHistoryEntry[]>([]);
   const [vehicleHistory, setVehicleHistory] = useState<VehicleLog[]>([]);
+  
+  // Cash Cut State
+  const [currentCashCut, setCurrentCashCut] = useState<CashCut | null>(null);
+  const [cashOpeningModalOpen, setCashOpeningModalOpen] = useState(false);
+  const [cashClosingModalOpen, setCashClosingModalOpen] = useState(false);
 
   const [foodModalOpen, setFoodModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -124,6 +134,25 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Load active Cash Cut
+      const { data: cutData } = await supabase
+        .from('cash_cuts')
+        .select('*')
+        .eq('status', 'open')
+        .maybeSingle(); // Use maybeSingle to avoid error if no row found
+
+      if (cutData) {
+        setCurrentCashCut({
+          id: cutData.id,
+          shiftName: cutData.shift_name,
+          openingTime: new Date(cutData.opening_time),
+          initialAmount: cutData.initial_amount,
+          status: 'open'
+        });
+      } else {
+        setCurrentCashCut(null);
+      }
+
       const { data: roomsData, error: roomsError } = await supabase
         .from('rooms')
         .select('*')
@@ -265,6 +294,50 @@ export default function App() {
 
   const currentShift = getShiftInfo();
 
+  // CASH CONTROL HANDLERS
+  const handleOpenCashCut = async (initialAmount: number) => {
+    const { data, error } = await supabase.from('cash_cuts').insert({
+      shift_name: currentShift.name,
+      opening_time: new Date(),
+      initial_amount: initialAmount,
+      status: 'open'
+    }).select().single();
+
+    if (error) {
+      setToast({ message: "Error al abrir caja", type: 'error' });
+    } else {
+      setToast({ message: "Caja abierta correctamente", type: 'success' });
+      setCashOpeningModalOpen(false);
+      fetchData(); // Refresh to get the new active cut
+    }
+  };
+
+  const handleCloseCashCut = async (declaredAmount: number, notes: string) => {
+    if (!currentCashCut) return;
+    
+    // Calculate final System Data
+    const systemExpected = totalShiftRevenue - totalExpenses; // Calculated from financial logic below
+    const difference = declaredAmount - (systemExpected + currentCashCut.initialAmount);
+
+    const { error } = await supabase.from('cash_cuts').update({
+      closing_time: new Date(),
+      final_declared_amount: declaredAmount,
+      system_expected_amount: systemExpected,
+      difference: difference,
+      status: 'closed',
+      notes: notes
+    }).eq('id', currentCashCut.id);
+
+    if (error) {
+      setToast({ message: "Error al cerrar caja", type: 'error' });
+    } else {
+      setToast({ message: "Corte de caja realizado", type: 'success' });
+      setCashClosingModalOpen(false);
+      setCurrentCashCut(null);
+      fetchData();
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -282,6 +355,13 @@ export default function App() {
   };
 
   const handleStatusChange = async (roomId: string, newStatus: RoomStatus) => {
+    // Check if Cash is open before allowing operations
+    if (!currentCashCut && newStatus === RoomStatus.OCCUPIED) {
+      setToast({ message: "⚠️ Debes ABRIR CAJA antes de operar.", type: 'error' });
+      setCashOpeningModalOpen(true);
+      return;
+    }
+
     if (newStatus === RoomStatus.OCCUPIED) {
       const room = rooms.find(r => r.id === roomId);
       if (room) {
@@ -378,6 +458,13 @@ export default function App() {
   };
 
   const handleRequestRelease = (room: Room) => {
+    // Check if Cash is open
+    if (!currentCashCut) {
+        setToast({ message: "⚠️ Debes ABRIR CAJA antes de cobrar.", type: 'error' });
+        setCashOpeningModalOpen(true);
+        return;
+    }
+
     // Check controls first
     if ((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0) {
       setToast({ 
@@ -692,6 +779,14 @@ export default function App() {
   };
 
   const handleAddConsumption = async (roomId: string, items: ConsumptionItem[]) => {
+    // Check if Cash is open
+    if (!currentCashCut) {
+        setToast({ message: "⚠️ Debes ABRIR CAJA antes de vender.", type: 'error' });
+        setFoodModalOpen(false);
+        setCashOpeningModalOpen(true);
+        return;
+    }
+
     const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
     
     try {
@@ -826,6 +921,12 @@ export default function App() {
   };
 
   const handleAddExpense = async (description: string, amount: number) => {
+    // Check if Cash is open
+    if (!currentCashCut) {
+        setToast({ message: "⚠️ Debes ABRIR CAJA antes de registrar gastos.", type: 'error' });
+        setCashOpeningModalOpen(true);
+        return;
+    }
     const { error } = await supabase.from('expenses').insert({ description, amount });
     if (!error) {
       fetchData();
@@ -1043,6 +1144,33 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6">
+            
+            {/* CASH CONTROL BUTTON */}
+            <button
+              onClick={() => {
+                if (currentCashCut) {
+                  setCashClosingModalOpen(true);
+                } else {
+                  setCashOpeningModalOpen(true);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold shadow-md transition ${
+                currentCashCut 
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                  : 'bg-rose-100 text-rose-700 hover:bg-rose-200 animate-pulse'
+              }`}
+            >
+              {currentCashCut ? (
+                <>
+                  <Unlock className="w-4 h-4" /> Caja Abierta
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" /> ABRIR CAJA
+                </>
+              )}
+            </button>
+
             <div className="text-right hidden sm:block">
               <p className="text-2xl font-bold text-slate-800 font-mono tracking-tight">
                 {currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -1344,7 +1472,7 @@ export default function App() {
                                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                                    {consumption.items.map(i => `${i.quantity} ${i.productName}`).join(', ')}
                                  </p>
-                                 <p className="text-[10px] text-slate-400 mt-1">
+                                 <p className="text-xs text-slate-400 mt-1">
                                    {consumption.timestamp.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                                  </p>
                               </div>
@@ -1425,6 +1553,23 @@ export default function App() {
         sourceRoom={selectedRoomForChange}
         availableRooms={rooms.filter(r => r.status === RoomStatus.AVAILABLE)}
         onConfirm={handleConfirmChangeRoom}
+      />
+      
+      {/* CASH CONTROL MODALS */}
+      <CashOpeningModal 
+        isOpen={cashOpeningModalOpen}
+        onClose={() => setCashOpeningModalOpen(false)}
+        onConfirm={handleOpenCashCut}
+        shiftName={currentShift.name}
+      />
+
+      <CashClosingModal 
+        isOpen={cashClosingModalOpen}
+        onClose={() => setCashClosingModalOpen(false)}
+        onConfirm={handleCloseCashCut}
+        systemExpected={totalGeneral - (currentCashCut?.initialAmount || 0)} // Total Revenue generated in session
+        initialAmount={currentCashCut?.initialAmount || 0}
+        shiftName={currentCashCut?.shiftName || ''}
       />
       
       {/* ADD PERSON CONFIRMATION MODAL */}
