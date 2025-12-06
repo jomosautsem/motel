@@ -39,6 +39,15 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     return { start, end };
   };
 
+  // Helper to calculate duration string
+  const getDurationString = (start: Date, end: Date) => {
+    if (!start || !end) return '-';
+    const diffMs = end.getTime() - start.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
   // Filter Data
   const { filteredRooms, filteredConsumptions, filteredExpenses, filteredVehicles, totals } = useMemo(() => {
     const { start, end } = getShiftRange(selectedDate, selectedShift);
@@ -124,14 +133,16 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
     const roomRows = filteredRooms.map(r => [
       `Hab ${r.roomId}`,
-      r.createdAt.toLocaleTimeString(),
+      r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
+      r.checkOutTime ? r.checkOutTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
+      getDurationString(r.checkInTime, r.checkOutTime),
       `$${r.totalPrice.toFixed(2)}`
     ]);
 
     (doc as any).autoTable({
       startY: yPos,
-      head: [['Habitación', 'Hora Salida', 'Cobrado']],
-      body: roomRows.length > 0 ? roomRows : [['-', '-', '-']],
+      head: [['Habitación', 'Entrada', 'Salida', 'Tiempo', 'Total']],
+      body: roomRows.length > 0 ? roomRows : [['-', '-', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [71, 85, 105] }, // Slate 600
     });
@@ -288,7 +299,10 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
                 <>
                   {filteredRooms.map(r => (
                      <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
-                        <span className="text-slate-600">Habitación {r.roomId} (Salida)</span>
+                        <div>
+                          <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
+                          <span className="text-xs text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
+                        </div>
                         <span className="font-bold text-slate-800">+ ${r.totalPrice}</span>
                      </div>
                   ))}
