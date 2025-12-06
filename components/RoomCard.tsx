@@ -180,7 +180,13 @@ export const RoomCard: React.FC<RoomCardProps> = ({
               <p className="text-[9px] opacity-90 uppercase tracking-wide mt-0.5">Salida</p>
             </>
           ) : (
-            <p className="text-xs font-medium opacity-70">{room.status}</p>
+            <>
+              {room.status === RoomStatus.CLEANING ? (
+                 <div className="animate-bounce text-2xl">🧹</div>
+              ) : (
+                 <p className="text-xs font-medium opacity-70">{room.status}</p>
+              )}
+            </>
           )}
 
           {/* Controls Indicator (Icons) */}
@@ -446,11 +452,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           )}
           
            {room.status === RoomStatus.CLEANING && (
-            <div className="flex flex-col items-center justify-center py-4 gap-1">
-              <div className="animate-bounce">
-                <Sparkles className="w-8 h-8 text-cyan-600 fill-cyan-300" />
+            <div className="flex flex-col items-center justify-center py-4 gap-2">
+              <div className="animate-bounce text-5xl filter drop-shadow-sm">
+                🧹
               </div>
-              <span className="text-xs font-black uppercase tracking-widest text-cyan-800 animate-pulse">En Limpieza</span>
+              <div className="flex items-center gap-1 bg-white/50 px-3 py-1 rounded-full backdrop-blur-sm">
+                 <Sparkles className="w-3 h-3 text-cyan-600" />
+                 <span className="text-xs font-black uppercase tracking-widest text-cyan-800 animate-pulse">Limpiando</span>
+              </div>
             </div>
           )}
         </div>
