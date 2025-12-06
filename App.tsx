@@ -35,6 +35,7 @@ import { ShiftHistoryManager } from './components/ShiftHistoryManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { AddTimeModal } from './components/AddTimeModal'; // Import new modal
 import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry, VehicleLog } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
@@ -73,6 +74,10 @@ export default function App() {
   const [changeRoomModalOpen, setChangeRoomModalOpen] = useState(false);
   const [selectedRoomForChange, setSelectedRoomForChange] = useState<Room | null>(null);
   
+  // Add Time Modal State
+  const [addTimeModalOpen, setAddTimeModalOpen] = useState(false);
+  const [selectedRoomForAddTime, setSelectedRoomForAddTime] = useState<Room | null>(null);
+
   // Add Person Modal State
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [selectedRoomForAddPerson, setSelectedRoomForAddPerson] = useState<Room | null>(null);
@@ -570,6 +575,41 @@ export default function App() {
       setToast({ message: `Persona extra agregada (+$${extraCharge}).`, type: 'success' });
     }
   };
+  
+  // --- ADD TIME LOGIC ---
+  const handleOpenAddTime = (room: Room) => {
+    setSelectedRoomForAddTime(room);
+    setAddTimeModalOpen(true);
+  };
+
+  const handleConfirmAddTime = async (hours: number, cost: number) => {
+    if (!selectedRoomForAddTime) return;
+    
+    const room = selectedRoomForAddTime;
+    const currentCheckout = room.checkOutTime ? new Date(room.checkOutTime) : new Date();
+    
+    // Add hours
+    const newCheckout = new Date(currentCheckout.getTime() + (hours * 60 * 60 * 1000));
+    
+    // Add cost
+    const newTotal = (room.totalPrice || 0) + cost;
+    
+    setRooms(prev => prev.map(r => r.id === room.id ? { ...r, checkOutTime: newCheckout, totalPrice: newTotal } : r));
+    setAddTimeModalOpen(false);
+    setSelectedRoomForAddTime(null);
+    
+    const { error } = await supabase.from('rooms').update({
+        check_out_time: newCheckout,
+        total_price: newTotal
+    }).eq('id', room.id);
+    
+    if (error) {
+        setToast({ message: "Error al aumentar tiempo", type: "error" });
+        fetchData();
+    } else {
+        setToast({ message: `Tiempo aumentado (+${hours}h).`, type: "success" });
+    }
+  };
 
   const handleAddConsumption = async (roomId: string, items: ConsumptionItem[]) => {
     const totalAmount = items.reduce((acc, item) => acc + item.total, 0);
@@ -1060,6 +1100,7 @@ export default function App() {
                   onOpenControls={handleOpenControls}
                   onChangeRoom={handleChangeRoom}
                   onAddPerson={() => handleAddPersonClick(room)}
+                  onAddTime={() => handleOpenAddTime(room)} // Connect Add Time handler
                   onRequestRelease={handleRequestRelease}
                   currentTime={currentTime}
                 />
@@ -1324,6 +1365,14 @@ export default function App() {
         message={`¿Está seguro que desea liberar la Habitación ${selectedRoomForRelease?.id}? Esto finalizará la estancia y cerrará la cuenta.`}
         confirmText="Sí, Liberar Habitación"
         type="danger"
+      />
+      
+      {/* ADD TIME MODAL */}
+      <AddTimeModal
+        isOpen={addTimeModalOpen}
+        onClose={() => setAddTimeModalOpen(false)}
+        room={selectedRoomForAddTime}
+        onConfirm={handleConfirmAddTime}
       />
 
       <FoodConsumptionModal

@@ -37,6 +37,7 @@ interface RoomCardProps {
   onOpenControls?: (room: Room) => void;
   onChangeRoom?: (room: Room) => void;
   onAddPerson?: (room: Room) => void;
+  onAddTime?: (room: Room) => void;
   onRequestRelease?: (room: Room) => void;
   variant?: 'standard' | 'compact';
   currentTime?: Date; // Added for real-time overdue calculation
@@ -49,6 +50,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   onOpenControls, 
   onChangeRoom,
   onAddPerson,
+  onAddTime,
   onRequestRelease,
   variant = 'standard',
   currentTime = new Date()
@@ -316,7 +318,13 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                       onClick={() => onOpenControls && onOpenControls(room)}
                     />
                     
-                    <ActionBtn icon={PlusCircle} label="Aumentar" colorClass="text-green-600 border-green-100 hover:bg-green-50" />
+                    <ActionBtn 
+                      icon={PlusCircle} 
+                      label="Aumentar" 
+                      colorClass="text-green-600 border-green-100 hover:bg-green-50" 
+                      onClick={() => onAddTime && onAddTime(room)}
+                    />
+                    
                     <ActionBtn icon={MinusCircle} label="Reducir" colorClass="text-orange-600 border-orange-100 hover:bg-orange-50" />
                     
                     <ActionBtn 
