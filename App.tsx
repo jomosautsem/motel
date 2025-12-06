@@ -10,9 +10,9 @@ import {
   LogOut, 
   Heart,
   Bot,
-  Sparkles,
-  Sun,
-  Moon,
+  Sparkles, 
+  Sun, 
+  Moon, 
   Sunset,
   ShoppingCart,
   TrendingDown,
@@ -35,7 +35,8 @@ import { ShiftHistoryManager } from './components/ShiftHistoryManager';
 import { Toast } from './components/Toast';
 import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { AddTimeModal } from './components/AddTimeModal'; // Import new modal
+import { AddTimeModal } from './components/AddTimeModal';
+import { ReduceTimeModal } from './components/ReduceTimeModal'; // Import ReduceTimeModal
 import { Room, RoomStatus, AppView, Product, Consumption, ConsumptionItem, VehicleReport, Employee, Expense, RoomHistoryEntry, VehicleLog } from './types';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
@@ -77,6 +78,10 @@ export default function App() {
   // Add Time Modal State
   const [addTimeModalOpen, setAddTimeModalOpen] = useState(false);
   const [selectedRoomForAddTime, setSelectedRoomForAddTime] = useState<Room | null>(null);
+
+  // Reduce Time Modal State
+  const [reduceTimeModalOpen, setReduceTimeModalOpen] = useState(false);
+  const [selectedRoomForReduceTime, setSelectedRoomForReduceTime] = useState<Room | null>(null);
 
   // Add Person Modal State
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
@@ -167,8 +172,8 @@ export default function App() {
           id: h.id,
           roomId: h.room_id,
           totalPrice: h.total_price,
-          checkInTime: h.check_in_time ? new Date(h.check_in_time) : undefined,
-          checkOutTime: h.check_out_time ? new Date(h.check_out_time) : undefined,
+          checkInTime: h.check_in_time && !isNaN(new Date(h.check_in_time).getTime()) ? new Date(h.check_in_time) : undefined,
+          checkOutTime: h.check_out_time && !isNaN(new Date(h.check_out_time).getTime()) ? new Date(h.check_out_time) : undefined,
           createdAt: h.created_at ? new Date(h.created_at) : new Date()
         })));
       }
@@ -316,8 +321,8 @@ export default function App() {
               id: h.id,
               roomId: h.room_id,
               totalPrice: h.total_price,
-              checkInTime: h.check_in_time ? new Date(h.check_in_time) : undefined,
-              checkOutTime: h.check_out_time ? new Date(h.check_out_time) : undefined,
+              checkInTime: h.check_in_time && !isNaN(new Date(h.check_in_time).getTime()) ? new Date(h.check_in_time) : undefined,
+              checkOutTime: h.check_out_time && !isNaN(new Date(h.check_out_time).getTime()) ? new Date(h.check_out_time) : undefined,
               createdAt: h.created_at ? new Date(h.created_at) : new Date()
             })));
          }
@@ -575,6 +580,32 @@ export default function App() {
       setToast({ message: `Persona extra agregada (+$${extraCharge}).`, type: 'success' });
     }
   };
+
+  // --- REMOVE PERSON LOGIC (No cost reduction) ---
+  const handleRemovePerson = async (room: Room) => {
+    const currentPeople = room.peopleCount || 2;
+    if (currentPeople <= 1) {
+      setToast({ message: "Mínimo 1 persona requerida.", type: 'error' });
+      return;
+    }
+    
+    // Decrease count but DO NOT change total price
+    const newCount = currentPeople - 1;
+    
+    setRooms(prev => prev.map(r => r.id === room.id ? { ...r, peopleCount: newCount } : r));
+
+    const { error } = await supabase.from('rooms').update({
+      people_count: newCount
+      // total_price is NOT updated, keeping the charge
+    }).eq('id', room.id);
+
+    if (error) {
+      setToast({ message: "Error al registrar salida de persona", type: 'error' });
+      fetchData();
+    } else {
+      setToast({ message: `Salida de persona registrada (Precio mantenido).`, type: 'success' });
+    }
+  };
   
   // --- ADD TIME LOGIC ---
   const handleOpenAddTime = (room: Room) => {
@@ -608,6 +639,41 @@ export default function App() {
         fetchData();
     } else {
         setToast({ message: `Tiempo aumentado (+${hours}h).`, type: "success" });
+    }
+  };
+
+  // --- REDUCE TIME LOGIC ---
+  const handleOpenReduceTime = (room: Room) => {
+    setSelectedRoomForReduceTime(room);
+    setReduceTimeModalOpen(true);
+  };
+
+  const handleConfirmReduceTime = async (hours: number, cost: number) => {
+    if (!selectedRoomForReduceTime) return;
+    
+    const room = selectedRoomForReduceTime;
+    const currentCheckout = room.checkOutTime ? new Date(room.checkOutTime) : new Date();
+    
+    // Reduce hours
+    const newCheckout = new Date(currentCheckout.getTime() - (hours * 60 * 60 * 1000));
+    
+    // Reduce cost (ensure not negative, optional validation)
+    const newTotal = Math.max(0, (room.totalPrice || 0) - cost);
+    
+    setRooms(prev => prev.map(r => r.id === room.id ? { ...r, checkOutTime: newCheckout, totalPrice: newTotal } : r));
+    setReduceTimeModalOpen(false);
+    setSelectedRoomForReduceTime(null);
+    
+    const { error } = await supabase.from('rooms').update({
+        check_out_time: newCheckout,
+        total_price: newTotal
+    }).eq('id', room.id);
+    
+    if (error) {
+        setToast({ message: "Error al reducir tiempo", type: "error" });
+        fetchData();
+    } else {
+        setToast({ message: `Tiempo reducido (-${hours}h).`, type: "success" });
     }
   };
 
@@ -1100,7 +1166,9 @@ export default function App() {
                   onOpenControls={handleOpenControls}
                   onChangeRoom={handleChangeRoom}
                   onAddPerson={() => handleAddPersonClick(room)}
-                  onAddTime={() => handleOpenAddTime(room)} // Connect Add Time handler
+                  onRemovePerson={() => handleRemovePerson(room)} // Connect Remove Person handler
+                  onAddTime={() => handleOpenAddTime(room)} 
+                  onReduceTime={() => handleOpenReduceTime(room)} 
                   onRequestRelease={handleRequestRelease}
                   currentTime={currentTime}
                 />
@@ -1373,6 +1441,14 @@ export default function App() {
         onClose={() => setAddTimeModalOpen(false)}
         room={selectedRoomForAddTime}
         onConfirm={handleConfirmAddTime}
+      />
+
+      {/* REDUCE TIME MODAL */}
+      <ReduceTimeModal
+        isOpen={reduceTimeModalOpen}
+        onClose={() => setReduceTimeModalOpen(false)}
+        room={selectedRoomForReduceTime}
+        onConfirm={handleConfirmReduceTime}
       />
 
       <FoodConsumptionModal

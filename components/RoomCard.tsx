@@ -37,7 +37,9 @@ interface RoomCardProps {
   onOpenControls?: (room: Room) => void;
   onChangeRoom?: (room: Room) => void;
   onAddPerson?: (room: Room) => void;
+  onRemovePerson?: (room: Room) => void;
   onAddTime?: (room: Room) => void;
+  onReduceTime?: (room: Room) => void;
   onRequestRelease?: (room: Room) => void;
   variant?: 'standard' | 'compact';
   currentTime?: Date; // Added for real-time overdue calculation
@@ -50,7 +52,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   onOpenControls, 
   onChangeRoom,
   onAddPerson,
+  onRemovePerson,
   onAddTime,
+  onReduceTime,
   onRequestRelease,
   variant = 'standard',
   currentTime = new Date()
@@ -325,7 +329,12 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                       onClick={() => onAddTime && onAddTime(room)}
                     />
                     
-                    <ActionBtn icon={MinusCircle} label="Reducir" colorClass="text-orange-600 border-orange-100 hover:bg-orange-50" />
+                    <ActionBtn 
+                      icon={MinusCircle} 
+                      label="Reducir" 
+                      colorClass="text-orange-600 border-orange-100 hover:bg-orange-50" 
+                      onClick={() => onReduceTime && onReduceTime(room)}
+                    />
                     
                     <ActionBtn 
                       icon={UserPlus} 
@@ -333,7 +342,14 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                       colorClass="text-purple-600 border-purple-100 hover:bg-purple-50" 
                       onClick={() => onAddPerson && onAddPerson(room)}
                     />
-                    <ActionBtn icon={UserMinus} label="Salida Persona" colorClass="text-pink-600 border-pink-100 hover:bg-pink-50" />
+                    
+                    {/* Updated ActionBtn for Remove Person */}
+                    <ActionBtn 
+                      icon={UserMinus} 
+                      label="Salida Persona" 
+                      colorClass="text-pink-600 border-pink-100 hover:bg-pink-50" 
+                      onClick={() => onRemovePerson && onRemovePerson(room)}
+                    />
                     
                     <ActionBtn icon={Edit} label="Editar E/S" colorClass="text-amber-600 border-amber-100 hover:bg-amber-50" />
                     <ActionBtn 
