@@ -96,7 +96,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     switch (status) {
       case RoomStatus.AVAILABLE: return 'bg-white border-green-200 text-green-700 hover:border-green-400';
       case RoomStatus.OCCUPIED: return getOccupancyColorClass();
-      case RoomStatus.CLEANING: return 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400';
+      case RoomStatus.CLEANING: return 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-md shadow-cyan-200 ring-2 ring-cyan-200';
       case RoomStatus.MAINTENANCE: return 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:border-yellow-400';
     }
   };
@@ -105,7 +105,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     if (status === RoomStatus.OCCUPIED) return 'bg-black/20 text-current backdrop-blur-sm';
     switch (status) {
       case RoomStatus.AVAILABLE: return 'bg-green-100 text-green-800';
-      case RoomStatus.CLEANING: return 'bg-blue-100 text-blue-800';
+      case RoomStatus.CLEANING: return 'bg-cyan-600 text-white font-bold animate-pulse';
       case RoomStatus.MAINTENANCE: return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-slate-100 text-slate-800';
     }
@@ -220,7 +220,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   );
 
   return (
-    <div className={`relative p-2.5 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between min-h-[260px] ${getStatusColor(room.status)}`}>
+    <div className={`relative p-2.5 rounded-xl border-2 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between min-h-[220px] ${getStatusColor(room.status)}`}>
       
       {/* Overdue Alarm Standard */}
       {isOverdue && (
@@ -237,8 +237,8 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             <h3 className="text-base font-bold">Habitación {room.id}</h3>
             <p className="text-[9px] opacity-75 font-medium tracking-wide">{room.type.toUpperCase()}</p>
           </div>
-          <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getStatusBadge(room.status)}`}>
-            {room.status}
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${getStatusBadge(room.status)}`}>
+            {room.status.toUpperCase()}
           </span>
         </div>
 
@@ -446,9 +446,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           )}
           
            {room.status === RoomStatus.CLEANING && (
-            <div className="flex items-center text-xs gap-2 opacity-60 py-4 justify-center">
-              <Sparkles className="w-4 h-4" />
-              <span>Limpieza</span>
+            <div className="flex flex-col items-center justify-center py-4 gap-1">
+              <div className="animate-bounce">
+                <Sparkles className="w-8 h-8 text-cyan-600 fill-cyan-300" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-widest text-cyan-800 animate-pulse">En Limpieza</span>
             </div>
           )}
         </div>
@@ -487,9 +489,9 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             {room.status === RoomStatus.CLEANING && (
               <button 
                 onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
-                className="w-full py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition shadow-sm hover:shadow-md"
+                className="w-full py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-bold hover:bg-cyan-700 transition shadow-sm hover:shadow-md shadow-cyan-300/50"
               >
-                Lista
+                Terminar Limpieza
               </button>
             )}
             {(room.status === RoomStatus.MAINTENANCE) && (
