@@ -36,6 +36,7 @@ interface RoomCardProps {
   onOpenControls?: (room: Room) => void;
   onChangeRoom?: (room: Room) => void;
   onAddPerson?: (room: Room) => void;
+  onRequestRelease?: (room: Room) => void;
   variant?: 'standard' | 'compact';
 }
 
@@ -46,6 +47,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   onOpenControls, 
   onChangeRoom,
   onAddPerson,
+  onRequestRelease,
   variant = 'standard' 
 }) => {
   const [showActions, setShowActions] = useState(false);
@@ -276,7 +278,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
                       icon={LogOut} 
                       label="Liberar" 
                       colorClass="text-rose-600 border-rose-100 hover:bg-rose-50" 
-                      onClick={() => onStatusChange(room.id, RoomStatus.CLEANING)}
+                      onClick={() => onRequestRelease && onRequestRelease(room)}
                     />
                     <ActionBtn 
                       icon={Sliders} 

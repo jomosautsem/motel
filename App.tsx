@@ -74,6 +74,10 @@ export default function App() {
   // Add Person Modal State
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [selectedRoomForAddPerson, setSelectedRoomForAddPerson] = useState<Room | null>(null);
+
+  // Release Confirmation State
+  const [releaseConfirmationOpen, setReleaseConfirmationOpen] = useState(false);
+  const [selectedRoomForRelease, setSelectedRoomForRelease] = useState<Room | null>(null);
   
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -296,6 +300,19 @@ export default function App() {
            check_in_time: room.checkInTime,
            check_out_time: new Date()
          });
+         
+         // Fetch history again to update dashboard
+         const { data: histData } = await supabase.from('room_history').select('*').order('created_at', { ascending: false });
+         if (histData) {
+            setRoomHistory(histData.map((h: any) => ({
+              id: h.id,
+              roomId: h.room_id,
+              totalPrice: h.total_price,
+              checkInTime: new Date(h.check_in_time),
+              checkOutTime: new Date(h.check_out_time),
+              createdAt: new Date(h.created_at)
+            })));
+         }
 
          await supabase.from('consumptions')
            .update({ status: 'Pagado' })
@@ -340,6 +357,31 @@ export default function App() {
       if (newStatus === RoomStatus.CLEANING) {
         fetchData(); 
       }
+    }
+  };
+
+  const handleRequestRelease = (room: Room) => {
+    // Check controls first
+    if ((room.tvControlCount || 0) > 0 || (room.acControlCount || 0) > 0) {
+      setToast({ 
+        message: "⚠️ No se puede liberar: Controles pendientes de devolución.", 
+        type: 'error' 
+      });
+      setSelectedRoomForControls(room);
+      setControlsModalOpen(true);
+      return;
+    }
+    
+    // Open Confirmation Modal
+    setSelectedRoomForRelease(room);
+    setReleaseConfirmationOpen(true);
+  };
+
+  const confirmRelease = () => {
+    if (selectedRoomForRelease) {
+      handleStatusChange(selectedRoomForRelease.id, RoomStatus.CLEANING);
+      setReleaseConfirmationOpen(false);
+      setSelectedRoomForRelease(null);
     }
   };
 
@@ -1007,6 +1049,7 @@ export default function App() {
                   onOpenControls={handleOpenControls}
                   onChangeRoom={handleChangeRoom}
                   onAddPerson={() => handleAddPersonClick(room)}
+                  onRequestRelease={handleRequestRelease}
                 />
               ))}
             </div>
@@ -1249,6 +1292,17 @@ export default function App() {
         message={`¿Está seguro de agregar una persona extra a la Habitación ${selectedRoomForAddPerson?.id}? Se cargará un costo adicional de $150.00.`}
         confirmText="Sí, Agregar (+ $150)"
         type="warning"
+      />
+
+      {/* RELEASE CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={releaseConfirmationOpen}
+        onClose={() => setReleaseConfirmationOpen(false)}
+        onConfirm={confirmRelease}
+        title="Confirmar Salida"
+        message={`¿Está seguro que desea liberar la Habitación ${selectedRoomForRelease?.id}? Esto finalizará la estancia y cerrará la cuenta.`}
+        confirmText="Sí, Liberar Habitación"
+        type="danger"
       />
 
       <FoodConsumptionModal
