@@ -65,7 +65,8 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     const { start, end } = getShiftRange(selectedDate, selectedShift);
 
     // 1. Room History (Completed Rents)
-    const fRooms = roomHistory.filter(h => h.createdAt >= start && h.createdAt <= end);
+    // FIX: Filter by checkInTime (when the sale was made) not createdAt (release time)
+    const fRooms = roomHistory.filter(h => h.checkInTime >= start && h.checkInTime <= end);
 
     // 2. Consumptions (Sales)
     const fCons = consumptions.filter(c => c.timestamp >= start && c.timestamp <= end);
@@ -359,12 +360,3 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     </div>
   );
 };
-
-// Helper for icon
-const History = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M3 3v5h5" />
-    <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
-    <path d="M12 7v5l4 2" />
-  </svg>
-);

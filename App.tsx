@@ -745,7 +745,9 @@ export default function App() {
     r.checkInTime && r.checkInTime >= shiftStartTime
   );
   
-  const shiftHistory = roomHistory.filter(h => h.createdAt >= shiftStartTime);
+  // FIX: Filter by checkInTime instead of createdAt (release time)
+  // This ensures revenue belongs to the shift where check-in happened
+  const shiftHistory = roomHistory.filter(h => h.checkInTime >= shiftStartTime);
   const historyRevenue = shiftHistory.reduce((acc, h) => acc + h.totalPrice, 0);
 
   const activeRoomCount = rooms.filter(r => r.status === RoomStatus.OCCUPIED).length; 
