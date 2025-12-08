@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Room, 
@@ -241,14 +240,21 @@ const App: React.FC = () => {
       // 8. Fetch Room History
       const { data: rHistoryData } = await supabase.from('room_history').select('*');
       if (rHistoryData) {
-          setRoomHistory(rHistoryData.map((h: any) => ({
-              id: h.id,
-              roomId: h.room_id,
-              totalPrice: h.total_price,
-              checkInTime: h.check_in_time ? new Date(h.check_in_time) : new Date(),
-              checkOutTime: h.check_out_time ? new Date(h.check_out_time) : new Date(),
-              createdAt: new Date(h.created_at)
-          })));
+          setRoomHistory(rHistoryData.map((h: any) => {
+              // Safety check for dates
+              const checkIn = h.check_in_time ? new Date(h.check_in_time) : new Date();
+              const checkOut = h.check_out_time ? new Date(h.check_out_time) : new Date();
+              const created = h.created_at ? new Date(h.created_at) : new Date();
+              
+              return {
+                  id: h.id,
+                  roomId: h.room_id,
+                  totalPrice: h.total_price,
+                  checkInTime: !isNaN(checkIn.getTime()) ? checkIn : new Date(),
+                  checkOutTime: !isNaN(checkOut.getTime()) ? checkOut : new Date(),
+                  createdAt: !isNaN(created.getTime()) ? created : new Date()
+              };
+          }));
       }
 
     } catch (error) {
@@ -306,16 +312,21 @@ const App: React.FC = () => {
     const activeRooms = rooms.filter(r => r.status === RoomStatus.OCCUPIED);
     setShiftOccupiedRooms(activeRooms.length);
     
-    // 2. Active People NOW
+    // 2. Active People NOW (Only in occupied rooms)
     const totalPeople = activeRooms.reduce((acc, r) => acc + (r.peopleCount || 0), 0);
     setActivePeopleCount(totalPeople);
 
-    // 3. Active Rents Revenue (Money currently in occupied rooms, excluding consumptions)
+    // 3. Active Rents Revenue
+    // IMPORTANT: Only count revenue if the Room's Check-In time is AFTER the shift started.
+    // If a room entered yesterday or in the previous shift, its money belongs to the previous shift.
     let currentRentRevenue = 0;
     activeRooms.forEach(r => {
-        const roomConsumptions = consumptions.filter(c => c.roomId === r.id && c.status === 'Pendiente en Habitación');
-        const consumptionTotal = roomConsumptions.reduce((sum, c) => sum + c.totalAmount, 0);
-        currentRentRevenue += (r.totalPrice || 0) - consumptionTotal;
+        // Only if CheckInTime >= Current Shift Start Time
+        if (r.checkInTime && new Date(r.checkInTime) >= startTime) {
+            const roomConsumptions = consumptions.filter(c => c.roomId === r.id && c.status === 'Pendiente en Habitación');
+            const consumptionTotal = roomConsumptions.reduce((sum, c) => sum + c.totalAmount, 0);
+            currentRentRevenue += (r.totalPrice || 0) - consumptionTotal;
+        }
     });
     setActiveRoomRentRevenue(currentRentRevenue);
 
@@ -323,7 +334,10 @@ const App: React.FC = () => {
     // Filter by checkInTime to assign revenue to the shift where entry happened
     const shiftHistory = roomHistory.filter(h => {
         if (!h.checkInTime) return false;
-        return h.checkInTime >= startTime;
+        // Validating dates to avoid crash
+        const cIn = new Date(h.checkInTime);
+        if (isNaN(cIn.getTime())) return false;
+        return cIn >= startTime;
     });
     const historyTotal = shiftHistory.reduce((acc, h) => acc + h.totalPrice, 0);
     setHistoryRevenue(historyTotal);
@@ -1165,16 +1179,13 @@ const App: React.FC = () => {
       {/* Sidebar */}
       <div className="w-20 lg:w-64 bg-slate-900 text-white flex flex-col shrink-0 transition-all duration-300">
         <div className="p-6 flex items-center gap-3 font-bold text-xl text-emerald-500">
-           <img 
-             src="/logo.png" 
-             alt="Logo" 
-             className="w-12 h-12 rounded-full border-2 border-emerald-600 shadow-md object-cover bg-slate-800"
-             onError={(e) => {
-               e.currentTarget.style.display = 'none';
-               e.currentTarget.nextElementSibling?.classList.remove('hidden');
-             }}
-           />
-           <BedDouble className="w-8 h-8 hidden" />
+           {/* Custom SVG Logo to ensure visibility without external assets */}
+           <svg className="w-12 h-12 rounded-full border-2 border-emerald-600 shadow-md bg-slate-800" viewBox="0 0 100 100">
+             <circle cx="50" cy="50" r="50" fill="#15803d" /> {/* Emerald Green Background */}
+             <circle cx="35" cy="35" r="15" fill="#000" /> {/* Left Black Ball */}
+             <circle cx="65" cy="35" r="15" fill="#000" /> {/* Right Black Ball */}
+             <path d="M50 85 C20 60 10 40 30 30 A15 15 0 0 1 50 50 A15 15 0 0 1 70 30 C90 40 80 60 50 85 Z" fill="#000" transform="translate(0, 10) scale(0.6)"/> {/* Heart */}
+           </svg>
            <span className="hidden lg:block">Motel Las Bolas</span>
         </div>
         
