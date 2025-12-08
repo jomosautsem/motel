@@ -205,7 +205,7 @@ const App: React.FC = () => {
                 productId: i.product_id,
                 productName: i.product_name,
                 quantity: i.quantity,
-                unitPrice: i.unit_price,
+                unit_price: i.unit_price,
                 total: i.total
             }))
         }));
@@ -1027,8 +1027,8 @@ const App: React.FC = () => {
       
       case AppView.ROOMS:
         return (
-          // Adjusted Grid here for smaller cards: sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 animate-fade-in">
+          // Adjusted Grid here for WIDER cards: sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
              {rooms.map(room => (
                <RoomCard 
                  key={room.id} 
