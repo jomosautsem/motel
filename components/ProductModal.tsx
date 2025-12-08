@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { Product } from '../types';
@@ -6,30 +7,49 @@ interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (product: Omit<Product, 'id'>) => void;
+  initialData?: Product | null;
 }
 
-export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave }) => {
+export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [type, setType] = useState('Alimentos'); // 'Alimentos' | 'Bebidas' | 'Otros'
   const [category, setCategory] = useState<Product['category']>('Cocina');
 
-  // Reset form when opening
+  // Reset or Fill form when opening
   useEffect(() => {
     if (isOpen) {
-      setName('');
-      setPrice('');
-      setType('Alimentos');
-      setCategory('Cocina');
+      if (initialData) {
+        // Editing Mode
+        setName(initialData.name);
+        setPrice(initialData.price.toString());
+        
+        // Determine Type based on Category
+        if (initialData.category === 'Bebida') {
+            setType('Bebidas');
+        } else if (initialData.category === 'Otro') {
+            setType('Otros');
+        } else {
+            setType('Alimentos');
+        }
+        setCategory(initialData.category);
+      } else {
+        // Create Mode
+        setName('');
+        setPrice('');
+        setType('Alimentos');
+        setCategory('Cocina');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
-  // Update available categories when Type changes
-  useEffect(() => {
-    if (type === 'Alimentos') setCategory('Cocina');
-    else if (type === 'Bebidas') setCategory('Bebida');
-    else if (type === 'Otros') setCategory('Otro');
-  }, [type]);
+  // Update available categories when Type changes (only if user interacts)
+  const handleTypeChange = (newType: string) => {
+    setType(newType);
+    if (newType === 'Alimentos') setCategory('Cocina');
+    else if (newType === 'Bebidas') setCategory('Bebida');
+    else if (newType === 'Otros') setCategory('Otro');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +59,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
       name,
       price: parseFloat(price),
       category,
-      stock: 50 // Default initial stock
+      stock: initialData ? initialData.stock : 50 // Preserve stock if editing
     });
     onClose();
   };
@@ -52,7 +72,9 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-          <h2 className="text-xl font-bold text-slate-800">Añadir Nuevo Producto</h2>
+          <h2 className="text-xl font-bold text-slate-800">
+            {initialData ? 'Editar Producto' : 'Añadir Nuevo Producto'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-rose-500 transition">
             <X className="w-6 h-6" />
           </button>
@@ -95,7 +117,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onS
               <label className="text-sm font-semibold text-slate-700">Tipo de Producto</label>
               <select 
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none bg-white cursor-pointer"
               >
                 <option value="Alimentos">Alimentos (Comidas/Snacks)</option>

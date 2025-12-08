@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Room, 
@@ -37,7 +38,9 @@ import {
   History,
   Sparkles,
   ShoppingCart,
-  LogOut
+  LogOut,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -80,7 +83,9 @@ const App: React.FC = () => {
   const [selectedRoomForControls, setSelectedRoomForControls] = useState<Room | null>(null);
 
   const [foodModalOpen, setFoodModalOpen] = useState(false);
+  
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
   const [addTimeModalOpen, setAddTimeModalOpen] = useState(false);
   const [selectedRoomForAddTime, setSelectedRoomForAddTime] = useState<Room | null>(null);
@@ -639,12 +644,45 @@ const App: React.FC = () => {
     showToast('Consumo agregado a habitación');
   };
 
+  const handleAddProduct = () => {
+    setEditingProduct(null);
+    setProductModalOpen(true);
+  };
+
+  const handleEditProductClick = (product: Product) => {
+    setEditingProduct(product);
+    setProductModalOpen(true);
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm("¿Estás seguro de eliminar este producto?")) {
+        const { error } = await supabase.from('products').delete().eq('id', id);
+        if (error) {
+            showToast("Error al eliminar producto", "error");
+        } else {
+            await fetchData();
+            showToast("Producto eliminado", "warning");
+        }
+    }
+  };
+
   const handleSaveProduct = async (productData: any) => {
-    const { error } = await supabase.from('products').insert(productData);
-    if (error) showToast("Error al guardar producto", "error");
-    else {
-        await fetchData();
-        showToast("Producto agregado al menú");
+    if (editingProduct) {
+        // Update existing product
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id);
+        if (error) showToast("Error al actualizar producto", "error");
+        else {
+            await fetchData();
+            showToast("Producto actualizado");
+        }
+    } else {
+        // Create new product
+        const { error } = await supabase.from('products').insert(productData);
+        if (error) showToast("Error al guardar producto", "error");
+        else {
+            await fetchData();
+            showToast("Producto agregado al menú");
+        }
     }
   };
 
@@ -1071,7 +1109,7 @@ const App: React.FC = () => {
                <h2 className="text-2xl font-bold text-slate-800">Alimentos y Bebidas</h2>
                <div className="flex gap-2">
                  <button 
-                   onClick={() => setProductModalOpen(true)}
+                   onClick={handleAddProduct}
                    className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition"
                  >
                    Añadir/Editar Menú
@@ -1116,7 +1154,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
                    {products.map(p => (
-                     <div key={p.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                     <div key={p.id} className="p-4 flex justify-between items-center hover:bg-slate-50 group">
                         <div className="flex items-center gap-3">
                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
                              p.category === 'Bebida' ? 'bg-blue-400' : p.category === 'Snack' ? 'bg-orange-400' : 'bg-green-400'
@@ -1128,7 +1166,25 @@ const App: React.FC = () => {
                              <p className="text-xs text-slate-400 uppercase">{p.category}</p>
                            </div>
                         </div>
-                        <span className="font-mono font-bold text-green-600">${p.price}</span>
+                        <div className="flex items-center gap-6">
+                          <span className="font-mono font-bold text-green-600">${p.price}</span>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                             <button 
+                               onClick={() => handleEditProductClick(p)}
+                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                               title="Editar"
+                             >
+                               <Edit className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => handleDeleteProduct(p.id)}
+                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                               title="Eliminar"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                          </div>
+                        </div>
                      </div>
                    ))}
                 </div>
@@ -1276,6 +1332,7 @@ const App: React.FC = () => {
         isOpen={productModalOpen}
         onClose={() => setProductModalOpen(false)}
         onSave={handleSaveProduct}
+        initialData={editingProduct}
       />
 
       {selectedRoomForAddTime && (
