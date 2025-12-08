@@ -26,6 +26,7 @@ import { ChangeRoomModal } from './components/ChangeRoomModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { AddTimeModal } from './components/AddTimeModal';
 import { ReduceTimeModal } from './components/ReduceTimeModal';
+import { MaintenanceModal } from './components/MaintenanceModal';
 import { analyzeBusinessData } from './services/geminiService';
 import { supabase } from './supabaseClient';
 import { 
@@ -104,6 +105,13 @@ const App: React.FC = () => {
 
   const [addPersonConfirmationOpen, setAddPersonConfirmationOpen] = useState(false);
   const [selectedRoomForAddPerson, setSelectedRoomForAddPerson] = useState<Room | null>(null);
+
+  // New Modals for Maintenance and Confirmation
+  const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false);
+  const [selectedRoomForMaintenance, setSelectedRoomForMaintenance] = useState<Room | null>(null);
+
+  const [occupancyConfirmationOpen, setOccupancyConfirmationOpen] = useState(false);
+  const [pendingOccupancyData, setPendingOccupancyData] = useState<any>(null);
 
   // Toast State
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'warning'} | null>(null);
@@ -376,15 +384,32 @@ const App: React.FC = () => {
       }
     } else {
       setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r));
-      supabase.from('rooms').update({ status: newStatus }).eq('id', roomId).then(({ error }) => {
+      
+      // Reset logic for Maintenance release
+      const updateData: any = { status: newStatus };
+      if (newStatus === RoomStatus.AVAILABLE) {
+          updateData.client_name = null; // Clear maintenance reason
+      }
+
+      supabase.from('rooms').update(updateData).eq('id', roomId).then(({ error }) => {
           if (error) showToast("Error actualizando estado", "error");
       });
     }
   };
 
-  const handleConfirmOccupancy = async (data: any) => {
-    if (!selectedRoomForOccupancy) return;
+  // 1. Initial occupancy form submit -> Opens Confirmation Modal
+  const handlePreConfirmOccupancy = (data: any) => {
+    setPendingOccupancyData(data);
+    setOccupancyModalOpen(false); // Close the input modal
+    setOccupancyConfirmationOpen(true); // Open the confirmation modal
+  };
+
+  // 2. Final confirm -> Database Update
+  const handleConfirmOccupancy = async () => {
+    if (!selectedRoomForOccupancy || !pendingOccupancyData) return;
     
+    const data = pendingOccupancyData;
+
     const { error: roomError } = await supabase.from('rooms').update({
         status: RoomStatus.OCCUPIED,
         client_name: data.clientName,
@@ -419,8 +444,9 @@ const App: React.FC = () => {
     }
 
     await fetchData(); 
-    setOccupancyModalOpen(false);
+    setOccupancyConfirmationOpen(false);
     setSelectedRoomForOccupancy(null);
+    setPendingOccupancyData(null);
     showToast(`Habitación ${selectedRoomForOccupancy.id} ocupada correctamente.`);
   };
 
@@ -604,6 +630,28 @@ const App: React.FC = () => {
       await fetchData();
       setReleaseModalOpen(false);
       showToast(`Habitación ${selectedRoomForRelease.id} liberada.`);
+    }
+  };
+
+  const handleMaintenance = (room: Room) => {
+    setSelectedRoomForMaintenance(room);
+    setMaintenanceModalOpen(true);
+  };
+
+  const handleConfirmMaintenance = async (reason: string) => {
+    if (!selectedRoomForMaintenance) return;
+
+    const { error } = await supabase.from('rooms').update({
+      status: RoomStatus.MAINTENANCE,
+      client_name: reason // We store the reason in client_name so it's visible on the card
+    }).eq('id', selectedRoomForMaintenance.id);
+
+    if (error) {
+      showToast("Error al poner en mantenimiento", "error");
+    } else {
+      await fetchData();
+      setMaintenanceModalOpen(false);
+      showToast(`Habitación ${selectedRoomForMaintenance.id} en mantenimiento.`);
     }
   };
 
@@ -1079,6 +1127,7 @@ const App: React.FC = () => {
                  onRemovePerson={handleRemovePersonClick}
                  onChangeRoom={handleChangeRoom}
                  onRequestRelease={handleRequestRelease}
+                 onMaintenance={handleMaintenance}
                  activeConsumptions={consumptions.filter(c => c.roomId === room.id && c.status === 'Pendiente en Habitación')}
                  currentTime={currentTime}
                />
@@ -1306,7 +1355,7 @@ const App: React.FC = () => {
           room={selectedRoomForOccupancy}
           isOpen={occupancyModalOpen}
           onClose={() => setOccupancyModalOpen(false)}
-          onConfirm={handleConfirmOccupancy}
+          onConfirm={handlePreConfirmOccupancy} // Updated Logic
           reports={vehicleReports}
         />
       )}
@@ -1388,6 +1437,25 @@ const App: React.FC = () => {
         title="¿Agregar Persona Extra?"
         message={`Se aumentará una persona a la Habitación ${selectedRoomForAddPerson?.id} y se sumarán $150 al total.`}
         confirmText="Sí, Agregar"
+        type="info"
+      />
+
+      {/* NEW: Maintenance Modal */}
+      <MaintenanceModal 
+        isOpen={maintenanceModalOpen}
+        onClose={() => setMaintenanceModalOpen(false)}
+        room={selectedRoomForMaintenance}
+        onConfirm={handleConfirmMaintenance}
+      />
+
+      {/* NEW: Occupancy Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={occupancyConfirmationOpen}
+        onClose={() => setOccupancyConfirmationOpen(false)}
+        onConfirm={handleConfirmOccupancy}
+        title="¿Confirmar Ocupación?"
+        message={`¿Estás seguro de ocupar la Habitación ${selectedRoomForOccupancy?.id} por $${pendingOccupancyData?.totalPrice}?`}
+        confirmText="Sí, Ocupar"
         type="info"
       />
 

@@ -14,7 +14,7 @@ export interface Room {
   // Occupancy Details
   checkInTime?: Date;
   checkOutTime?: Date;
-  clientName?: string;
+  clientName?: string; // Used for Client Name OR Maintenance Reason
   peopleCount?: number;
   entryType?: 'Auto' | 'Moto' | 'Pie';
   vehiclePlate?: string;

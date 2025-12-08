@@ -26,7 +26,8 @@ import {
   ShoppingCart,
   Tv,
   Thermometer,
-  Hourglass
+  Hourglass,
+  Wrench
 } from 'lucide-react';
 
 interface RoomCardProps {
@@ -40,8 +41,9 @@ interface RoomCardProps {
   onAddTime?: (room: Room) => void;
   onReduceTime?: (room: Room) => void;
   onRequestRelease?: (room: Room) => void;
+  onMaintenance?: (room: Room) => void; // New Prop
   variant?: 'standard' | 'compact';
-  currentTime?: Date; // Added for real-time overdue calculation
+  currentTime?: Date; 
 }
 
 export const RoomCard: React.FC<RoomCardProps> = ({ 
@@ -55,6 +57,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   onAddTime,
   onReduceTime,
   onRequestRelease,
+  onMaintenance,
   variant = 'standard',
   currentTime = new Date()
 }) => {
@@ -82,8 +85,6 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   const overdueMinutes = getOverdueTime();
 
   const getOccupancyColorClass = () => {
-    // If overdue, force Red/Danger styling? Or keep urgency on badge?
-    // Let's keep the paid duration color but add visual alarm.
     const hours = getDurationHours();
     if (hours <= 2.1) return 'bg-green-500 text-white border-green-600';
     if (hours <= 4.1) return 'bg-orange-500 text-white border-orange-600';
@@ -97,7 +98,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
       case RoomStatus.AVAILABLE: return 'bg-white border-green-200 text-green-700 hover:border-green-400';
       case RoomStatus.OCCUPIED: return getOccupancyColorClass();
       case RoomStatus.CLEANING: return 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-md shadow-cyan-200 ring-2 ring-cyan-200';
-      case RoomStatus.MAINTENANCE: return 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:border-yellow-400';
+      case RoomStatus.MAINTENANCE: return 'bg-slate-800 border-slate-900 text-slate-300 shadow-inner'; // Black styling for Maintenance
     }
   };
 
@@ -106,7 +107,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
     switch (status) {
       case RoomStatus.AVAILABLE: return 'bg-green-100 text-green-800';
       case RoomStatus.CLEANING: return 'bg-cyan-600 text-white font-bold animate-pulse';
-      case RoomStatus.MAINTENANCE: return 'bg-yellow-100 text-yellow-800';
+      case RoomStatus.MAINTENANCE: return 'bg-red-500 text-white';
       default: return 'bg-slate-100 text-slate-800';
     }
   };
@@ -183,6 +184,11 @@ export const RoomCard: React.FC<RoomCardProps> = ({
             <>
               {room.status === RoomStatus.CLEANING ? (
                  <div className="animate-bounce text-2xl">🧹</div>
+              ) : room.status === RoomStatus.MAINTENANCE ? (
+                 <div className="text-yellow-500">
+                    <Wrench className="w-8 h-8 mb-1 mx-auto" />
+                    <span className="text-[9px] uppercase tracking-wide text-yellow-500 font-bold">Mantenimiento</span>
+                 </div>
               ) : (
                  <p className="text-xs font-medium opacity-70">{room.status}</p>
               )}
@@ -226,7 +232,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({
   );
 
   return (
-    <div className={`relative p-5 rounded-2xl border-2 transition-all duration-300 shadow-sm hover:shadow-lg flex flex-col justify-between min-h-[320px] ${getStatusColor(room.status)}`}>
+    <div className={`relative p-5 rounded-2xl border-2 transition-all duration-300 shadow-sm hover:shadow-lg flex flex-col justify-between min-h-[300px] ${getStatusColor(room.status)}`}>
       
       {/* Overdue Alarm Standard */}
       {isOverdue && (
@@ -445,9 +451,16 @@ export const RoomCard: React.FC<RoomCardProps> = ({
           )}
 
           {room.status === RoomStatus.MAINTENANCE && (
-            <div className="flex flex-col items-center justify-center py-10 gap-2 opacity-60">
-              <AlertTriangle className="w-8 h-8" />
-              <span className="text-sm font-medium">En Mantenimiento</span>
+            <div className="flex flex-col items-center justify-center py-8 gap-4 opacity-80">
+              <div className="bg-yellow-500/20 p-4 rounded-full">
+                <Wrench className="w-10 h-10 text-yellow-500" />
+              </div>
+              <div className="text-center">
+                <span className="text-sm font-bold text-yellow-500 uppercase tracking-widest">En Mantenimiento</span>
+                {room.clientName && (
+                  <p className="text-xs text-slate-400 mt-2 px-2 italic">"{room.clientName}"</p>
+                )}
+              </div>
             </div>
           )}
           
@@ -488,27 +501,45 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         ) : (
           <div className="flex gap-2">
             {room.status === RoomStatus.AVAILABLE && (
-              <button 
-                onClick={() => onStatusChange(room.id, RoomStatus.OCCUPIED)}
-                className="w-full py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition shadow-lg shadow-rose-200"
-              >
-                Ocupar
-              </button>
+              <>
+                <button 
+                  onClick={() => onStatusChange(room.id, RoomStatus.OCCUPIED)}
+                  className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition shadow-lg shadow-rose-200"
+                >
+                  Ocupar
+                </button>
+                <button 
+                  onClick={() => onMaintenance && onMaintenance(room)}
+                  className="px-3 py-2.5 bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition"
+                  title="Poner en Mantenimiento"
+                >
+                  <Wrench className="w-4 h-4" />
+                </button>
+              </>
             )}
             {room.status === RoomStatus.CLEANING && (
-              <button 
-                onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
-                className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-bold hover:bg-cyan-700 transition shadow-lg shadow-cyan-200/50"
-              >
-                Terminar Limpieza
-              </button>
+              <>
+                <button 
+                  onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
+                  className="flex-1 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-bold hover:bg-cyan-700 transition shadow-lg shadow-cyan-200/50"
+                >
+                  Terminar Limpieza
+                </button>
+                <button 
+                  onClick={() => onMaintenance && onMaintenance(room)}
+                  className="px-3 py-2.5 bg-slate-200 text-slate-600 rounded-xl hover:bg-slate-300 transition"
+                  title="Poner en Mantenimiento"
+                >
+                  <Wrench className="w-4 h-4" />
+                </button>
+              </>
             )}
             {(room.status === RoomStatus.MAINTENANCE) && (
               <button 
                 onClick={() => onStatusChange(room.id, RoomStatus.AVAILABLE)}
                 className="w-full py-2.5 bg-yellow-600 text-white rounded-xl text-sm font-bold hover:bg-yellow-700 transition shadow-lg shadow-yellow-200"
               >
-                Listo
+                Terminar Mantenimiento
               </button>
             )}
           </div>
