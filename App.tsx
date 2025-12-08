@@ -67,6 +67,9 @@ const App: React.FC = () => {
   const [shiftEmployeeConsumptionRevenue, setShiftEmployeeConsumptionRevenue] = useState(0);
   const [shiftExpensesTotal, setShiftExpensesTotal] = useState(0);
   const [historyRevenue, setHistoryRevenue] = useState(0);
+  
+  // Previous Shift Stats
+  const [previousShiftTotal, setPreviousShiftTotal] = useState(0);
 
   // Shift Info
   const [currentShift, setCurrentShift] = useState('');
@@ -368,6 +371,80 @@ const App: React.FC = () => {
     // 6. Expenses (Spent THIS SHIFT)
     const shiftExp = expenses.filter(e => e.date >= startTime);
     setShiftExpensesTotal(shiftExp.reduce((acc, e) => acc + e.amount, 0));
+
+    // --- PREVIOUS SHIFT CALCULATION ---
+    const calculatePreviousShiftTotal = () => {
+        const now = new Date();
+        const hour = now.getHours();
+        
+        // Define Previous Shift Range based on Current Hour
+        let prevStart = new Date(now);
+        let prevEnd = new Date(now);
+
+        if (hour >= 7 && hour < 14) {
+             // Current: Matutino. Previous: Nocturno (Yesterday 21:00 - Today 07:00)
+             prevStart.setDate(prevStart.getDate() - 1);
+             prevStart.setHours(21, 0, 0, 0);
+             prevEnd.setHours(7, 0, 0, 0);
+        } else if (hour >= 14 && hour < 21) {
+             // Current: Vespertino. Previous: Matutino (Today 07:00 - Today 14:00)
+             prevStart.setHours(7, 0, 0, 0);
+             prevEnd.setHours(14, 0, 0, 0);
+        } else {
+             // Current: Nocturno. Previous: Vespertino.
+             if (hour < 7) {
+                 // It's early morning (e.g. 02:00). Previous was Yesterday 14:00 - 21:00
+                 prevStart.setDate(prevStart.getDate() - 1);
+                 prevStart.setHours(14, 0, 0, 0);
+                 prevEnd.setDate(prevEnd.getDate() - 1);
+                 prevEnd.setHours(21, 0, 0, 0);
+             } else {
+                 // It's late night (e.g. 23:00). Previous was Today 14:00 - 21:00
+                 prevStart.setHours(14, 0, 0, 0);
+                 prevEnd.setHours(21, 0, 0, 0);
+             }
+        }
+
+        // 1. Previous Room Revenue (Completed + Active that entered previously)
+        // Completed:
+        const prevHistory = roomHistory.filter(h => {
+             const cIn = new Date(h.checkInTime);
+             return !isNaN(cIn.getTime()) && cIn >= prevStart && cIn < prevEnd;
+        });
+        const prevHistoryTotal = prevHistory.reduce((acc, h) => acc + h.totalPrice, 0);
+
+        // Active (Still occupied but entered in previous shift):
+        const prevActiveRooms = rooms.filter(r => {
+             if (r.status !== RoomStatus.OCCUPIED || !r.checkInTime) return false;
+             const cIn = new Date(r.checkInTime);
+             return !isNaN(cIn.getTime()) && cIn >= prevStart && cIn < prevEnd;
+        });
+        // Logic for active room revenue (Rent price minus pending consumptions)
+        const prevActiveTotal = prevActiveRooms.reduce((acc, r) => {
+             const roomCons = consumptions.filter(c => c.roomId === r.id && c.status === 'Pendiente en Habitación');
+             const consTotal = roomCons.reduce((sum, c) => sum + c.totalAmount, 0);
+             return acc + ((r.totalPrice || 0) - consTotal);
+        }, 0);
+
+        // 2. Previous Consumptions
+        const prevConsumptions = consumptions.filter(c => {
+             const t = new Date(c.timestamp);
+             return t >= prevStart && t < prevEnd;
+        });
+        const prevConsTotal = prevConsumptions.reduce((acc, c) => acc + c.totalAmount, 0);
+
+        // 3. Previous Expenses
+        const prevExpenses = expenses.filter(e => {
+             const d = new Date(e.date);
+             return d >= prevStart && d < prevEnd;
+        });
+        const prevExpTotal = prevExpenses.reduce((acc, e) => acc + e.amount, 0);
+
+        const totalPrev = (prevHistoryTotal + prevActiveTotal + prevConsTotal) - prevExpTotal;
+        setPreviousShiftTotal(totalPrev);
+    };
+    
+    calculatePreviousShiftTotal();
 
   }, [rooms, consumptions, expenses, roomHistory, currentTime]);
 
@@ -1038,10 +1115,10 @@ const App: React.FC = () => {
               </div>
 
                {/* Total Turno Anterior */}
-               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between opacity-60">
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
                 <div>
                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Turno Anterior</p>
-                   <p className="text-3xl font-bold text-slate-800 mt-1">$ --</p>
+                   <p className="text-3xl font-bold text-slate-800 mt-1">${previousShiftTotal.toFixed(2)}</p>
                    <p className="text-xs text-slate-400 font-semibold mt-1">Cierre finalizado</p>
                 </div>
                 <div className="bg-slate-100 p-3 rounded-xl text-slate-400">
@@ -1097,7 +1174,7 @@ const App: React.FC = () => {
               <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                  <BedDouble className="w-5 h-5 text-slate-500" /> Estado de Habitaciones
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {rooms.map(room => (
                    <RoomCard 
                       key={room.id} 
@@ -1277,6 +1354,8 @@ const App: React.FC = () => {
             consumptions={consumptions}
             expenses={expenses}
             vehicleHistory={vehicleHistory}
+            rooms={rooms}
+            employees={employees} // Passed employees to history manager
           />
         );
 

@@ -1,20 +1,24 @@
 
 import React, { useState, useMemo } from 'react';
-import { RoomHistoryEntry, Consumption, Expense, VehicleLog } from '../types';
-import { Calendar, FileText, Download, Filter, Search, AlertCircle, History } from 'lucide-react';
+import { RoomHistoryEntry, Consumption, Expense, VehicleLog, Room, RoomStatus, Employee } from '../types';
+import { Calendar, FileText, Download, Filter, Search, AlertCircle, History, PlayCircle, ShoppingBag } from 'lucide-react';
 
 interface ShiftHistoryManagerProps {
   roomHistory: RoomHistoryEntry[];
   consumptions: Consumption[];
   expenses: Expense[];
   vehicleHistory: VehicleLog[];
+  rooms: Room[];
+  employees: Employee[]; // Added to resolve employee names in logs
 }
 
 export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
   roomHistory,
   consumptions,
   expenses,
-  vehicleHistory
+  vehicleHistory,
+  rooms,
+  employees
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState<'Matutino' | 'Vespertino' | 'Nocturno'>('Matutino');
@@ -51,33 +55,57 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
   // Logic to infer Paid Hours from Price
   const getPaidHours = (price: number) => {
-    // 2hr $220, 4hr $280, 5hr $300, 8hr $330, 12hr $480
     if (price <= 240) return 2;
     if (price <= 290) return 4;
     if (price <= 315) return 5;
     if (price <= 350) return 8;
-    return 12; // Assuming 12h for anything higher unless it's huge
+    return 12;
   };
 
   // Filter Data
-  const { filteredRooms, filteredConsumptions, filteredExpenses, filteredVehicles, totals } = useMemo(() => {
+  const { filteredRooms, filteredConsumptions, filteredExpenses, filteredVehicles, activeRoomsInShift, totals, soldItems } = useMemo(() => {
     const { start, end } = getShiftRange(selectedDate, selectedShift);
 
-    // 1. Room History (Completed Rents)
-    // FIX: Filter by checkInTime (when the sale was made) not createdAt (release time)
+    // 1. Room History
     const fRooms = roomHistory.filter(h => {
         if (!h.checkInTime) return false;
         return h.checkInTime >= start && h.checkInTime <= end;
     });
 
-    // 2. Consumptions (Sales)
+    // 2. Active Rooms
+    const activeRooms = rooms.filter(r => {
+        if (r.status !== RoomStatus.OCCUPIED || !r.checkInTime) return false;
+        if (isNaN(new Date(r.checkInTime).getTime())) return false;
+        return r.checkInTime >= start && r.checkInTime <= end;
+    });
+
+    // 3. Consumptions
     const fCons = consumptions.filter(c => c.timestamp >= start && c.timestamp <= end);
 
-    // 3. Expenses
+    // 4. Expenses
     const fExp = expenses.filter(e => e.date >= start && e.date <= end);
 
-    // 4. Vehicles
+    // 5. Vehicles
     const fVeh = vehicleHistory.filter(v => v.entryTime >= start && v.entryTime <= end);
+
+    // 6. Flattened Sold Items (New Feature)
+    const items = fCons.flatMap(c => {
+        let target = '-';
+        if (c.roomId) target = `Hab ${c.roomId}`;
+        else if (c.employeeId) {
+            const emp = employees.find(e => e.id === c.employeeId);
+            target = emp ? `${emp.name} (Emp)` : 'Empleado';
+        }
+
+        return c.items.map(i => ({
+            time: c.timestamp,
+            target,
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            total: i.total
+        }));
+    });
 
     // Totals
     const totalRoomRevenue = fRooms.reduce((acc, r) => acc + r.totalPrice, 0);
@@ -90,9 +118,11 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
       filteredConsumptions: fCons,
       filteredExpenses: fExp,
       filteredVehicles: fVeh,
+      activeRoomsInShift: activeRooms,
+      soldItems: items,
       totals: { totalRoomRevenue, totalConsRevenue, totalExpensesAmt, netIncome }
     };
-  }, [selectedDate, selectedShift, roomHistory, consumptions, expenses, vehicleHistory]);
+  }, [selectedDate, selectedShift, roomHistory, consumptions, expenses, vehicleHistory, rooms, employees]);
 
 
   const generatePDF = () => {
@@ -125,10 +155,10 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
     const summaryData = [
       ['Concepto', 'Monto'],
-      ['Renta de Habitaciones', `$${totals.totalRoomRevenue.toFixed(2)}`],
+      ['Renta de Habitaciones (Cobradas)', `$${totals.totalRoomRevenue.toFixed(2)}`],
       ['Venta de Productos/Consumos', `$${totals.totalConsRevenue.toFixed(2)}`],
       ['Gastos Operativos', `-$${totals.totalExpensesAmt.toFixed(2)}`],
-      ['UTILIDAD NETA DEL TURNO', `$${totals.netIncome.toFixed(2)}`]
+      ['UTILIDAD NETA (Caja)', `$${totals.netIncome.toFixed(2)}`]
     ];
 
     (doc as any).autoTable({
@@ -142,8 +172,59 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
+    // -- Detailed Products Sold Table (NEW) --
+    doc.text("Detalle de Ventas (Productos)", 14, yPos);
+    yPos += 5;
+
+    const productRows = soldItems.map(item => [
+       item.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+       item.target,
+       item.productName,
+       item.quantity.toString(),
+       `$${item.unitPrice.toFixed(2)}`,
+       `$${item.total.toFixed(2)}`
+    ]);
+
+    (doc as any).autoTable({
+        startY: yPos,
+        head: [['Hora', 'Destino', 'Producto', 'Cant', 'P.Unit', 'Total']],
+        body: productRows.length > 0 ? productRows : [['-', '-', '-', '-', '-', '-']],
+        theme: 'striped',
+        headStyles: { fillColor: [147, 51, 234] }, // Purple 600
+        styles: { fontSize: 9 }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // -- Active Rooms Table --
+    if (activeRoomsInShift.length > 0) {
+        // Check page break
+        if (yPos > 240) { doc.addPage(); yPos = 20; }
+        
+        doc.text("Habitaciones Activas (Pendientes de Cobro)", 14, yPos);
+        yPos += 5;
+
+        const activeRows = activeRoomsInShift.map(r => [
+            `Hab ${r.id}`,
+            r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
+            "En curso",
+            `$${(r.totalPrice || 0).toFixed(2)}`
+        ]);
+
+        (doc as any).autoTable({
+            startY: yPos,
+            head: [['Habitación', 'Entrada', 'Estado', 'Acumulado']],
+            body: activeRows,
+            theme: 'striped',
+            headStyles: { fillColor: [22, 163, 74] }, // Green 600
+        });
+
+        yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
+
     // -- Room History Table --
-    doc.text("Detalle de Habitaciones (Auditoría de Tiempo)", 14, yPos);
+    if (yPos > 240) { doc.addPage(); yPos = 20; }
+    doc.text("Habitaciones Cobradas (Historial)", 14, yPos);
     yPos += 5;
 
     const roomRows = filteredRooms.map(r => {
@@ -168,7 +249,7 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
           r.checkOutTime ? r.checkOutTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-',
           actualStr,
           `$${r.totalPrice.toFixed(2)}`,
-          excessStr // New Column
+          excessStr 
         ];
     });
 
@@ -183,6 +264,7 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
     // -- Expenses Table --
+    if (yPos > 240) { doc.addPage(); yPos = 20; }
     doc.text("Detalle de Gastos", 14, yPos);
     yPos += 5;
 
@@ -200,15 +282,10 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
       headStyles: { fillColor: [225, 29, 72] }, // Rose 600
     });
     
-    // Add page if needed
-    if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
-    } else {
-        yPos = (doc as any).lastAutoTable.finalY + 15;
-    }
-
     // -- Vehicles Table --
+    if (yPos > 230) { doc.addPage(); yPos = 20; }
+    else { yPos = (doc as any).lastAutoTable.finalY + 15; }
+    
     doc.text("Registro de Vehículos", 14, yPos);
     yPos += 5;
 
@@ -248,7 +325,6 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
 
       {/* Filters Card */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-end">
-        
         <div className="w-full md:w-auto">
            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
              <Calendar className="w-4 h-4" /> Seleccionar Fecha
@@ -285,7 +361,6 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
              Descargar Reporte PDF
            </button>
         </div>
-
       </div>
 
       {/* Preview Section */}
@@ -321,58 +396,94 @@ export const ShiftHistoryManager: React.FC<ShiftHistoryManagerProps> = ({
         </div>
 
         {/* Activity Preview */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-           <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-             <Search className="w-5 h-5 text-orange-500" /> Actividad Registrada
-           </h3>
-           <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar">
-              {filteredRooms.length === 0 && filteredExpenses.length === 0 && filteredConsumptions.length === 0 ? (
-                 <p className="text-center text-slate-400 py-10 italic">No hay movimientos registrados para este turno.</p>
-              ) : (
-                <>
-                  {filteredRooms.map(r => {
-                     const paidHours = getPaidHours(r.totalPrice);
-                     let excessStr = null;
-                     
-                     if (r.checkInTime && r.checkOutTime) {
-                        const actualMs = r.checkOutTime.getTime() - r.checkInTime.getTime();
-                        const actualHours = actualMs / (1000 * 60 * 60);
-                        const excessMinutes = Math.floor((actualHours - paidHours) * 60);
-                        if (excessMinutes > 15) {
-                            excessStr = `+${Math.floor(excessMinutes)}m`;
-                        }
-                     }
-
-                     return (
-                        <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
-                            <div>
-                              <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
-                              <div className="flex gap-2 text-xs">
-                                <span className="text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
-                                {excessStr && (
-                                    <span className="text-rose-500 font-bold flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" /> Exceso {excessStr}
-                                    </span>
-                                )}
-                              </div>
+        <div className="space-y-6">
+            
+            {/* Active Rooms */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <PlayCircle className="w-5 h-5 text-green-500" /> Habitaciones Activas (Sin Salida)
+                </h3>
+                <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                    {activeRoomsInShift.length === 0 ? (
+                        <p className="text-center text-slate-400 text-sm italic py-4">No hay habitaciones activas iniciadas en este turno.</p>
+                    ) : (
+                        activeRoomsInShift.map(r => (
+                            <div key={r.id} className="flex justify-between items-center bg-green-50 p-3 rounded-xl border border-green-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                    <div>
+                                        <p className="font-bold text-slate-800 text-sm">Habitación {r.id}</p>
+                                        <p className="text-xs text-slate-500">Entrada: {r.checkInTime ? r.checkInTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--:--'}</p>
+                                    </div>
+                                </div>
+                                <span className="font-bold text-green-700 text-sm">${r.totalPrice?.toFixed(2)}</span>
                             </div>
-                            <span className="font-bold text-slate-800">+ ${r.totalPrice}</span>
-                        </div>
-                     );
-                  })}
-                  {filteredExpenses.map(e => (
-                     <div key={e.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
-                        <span className="text-rose-600">{e.description}</span>
-                        <span className="font-bold text-rose-600">- ${e.amount}</span>
-                     </div>
-                  ))}
-                </>
-              )}
-           </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Sold Products Details (NEW) */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-purple-500" /> Detalle de Ventas / Consumos
+                </h3>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+                    {soldItems.length === 0 ? (
+                         <p className="text-center text-slate-400 py-6 italic text-sm">No hay productos vendidos en este turno.</p>
+                    ) : (
+                        <table className="w-full text-xs text-left">
+                            <thead className="text-slate-400 font-bold uppercase border-b border-slate-100">
+                                <tr>
+                                    <th className="pb-2">Prod</th>
+                                    <th className="pb-2">Dest</th>
+                                    <th className="pb-2 text-right">Cant</th>
+                                    <th className="pb-2 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {soldItems.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50">
+                                        <td className="py-2 pr-2 font-medium text-slate-700 truncate max-w-[120px]" title={item.productName}>
+                                            {item.productName}
+                                        </td>
+                                        <td className="py-2 text-slate-500">{item.target}</td>
+                                        <td className="py-2 text-right text-slate-600">{item.quantity}</td>
+                                        <td className="py-2 text-right font-bold text-green-600">${item.total}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </div>
+
+            {/* Historical Activity */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <Search className="w-5 h-5 text-orange-500" /> Habitaciones Cobradas (Historial)
+                </h3>
+                <div className="space-y-4 max-h-[200px] overflow-y-auto custom-scrollbar">
+                    {filteredRooms.length === 0 ? (
+                        <p className="text-center text-slate-400 py-6 italic text-sm">No hay rentas cobradas en este turno.</p>
+                    ) : (
+                        filteredRooms.map(r => (
+                            <div key={r.id} className="text-sm flex justify-between border-b border-slate-50 pb-2">
+                                <div>
+                                <span className="text-slate-600 block">Habitación {r.roomId} (Salida)</span>
+                                <div className="flex gap-2 text-xs">
+                                    <span className="text-slate-400">{getDurationString(r.checkInTime, r.checkOutTime)}</span>
+                                </div>
+                                </div>
+                                <span className="font-bold text-slate-800">+ ${r.totalPrice}</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
         </div>
-
       </div>
-
     </div>
   );
 };
