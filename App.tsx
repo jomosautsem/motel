@@ -125,16 +125,19 @@ const App: React.FC = () => {
   const initSystem = async () => {
     try {
       // 1. AUTO-LOGIN (Fixes "No rooms visible" issue due to RLS)
+      // We explicitly check session and login if missing to ensure data access
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        // Automatically login as admin to ensure RLS policies allow reading data
+        console.log("No session found. Attempting Auto-Login...");
         const { error: authError } = await supabase.auth.signInWithPassword({
           email: 'motellasbolas@gmail.com',
           password: 'j5s82QSM'
         });
         if (authError) {
-            console.error("Auth Error (Auto-Login Failed):", authError);
+            console.error("Auto-Login Failed:", authError);
             showToast("Error de autenticación. Recargue la página.", "error");
+        } else {
+            console.log("Auto-Login Successful");
         }
       }
 
@@ -272,7 +275,7 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.error("Error fetching data:", error);
-      showToast("Error al cargar datos", "error");
+      showToast("Error al cargar datos. Verifique conexión.", "error");
     }
   };
 
@@ -706,7 +709,11 @@ const App: React.FC = () => {
     if (confirm("¿Estás seguro de eliminar este producto?")) {
         const { error } = await supabase.from('products').delete().eq('id', id);
         if (error) {
-            showToast("Error al eliminar producto", "error");
+            if (error.code === '23503') {
+                showToast("No se puede eliminar: Tiene historial de ventas.", "error");
+            } else {
+                showToast("Error al eliminar producto", "error");
+            }
         } else {
             await fetchData();
             showToast("Producto eliminado", "warning");
